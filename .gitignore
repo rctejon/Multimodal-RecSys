@@ -8,6 +8,7 @@ __pycache__/
 
 # Distribution / packaging
 .Python
+.idea/
 build/
 develop-eggs/
 dist/
@@ -20,7 +21,9 @@ parts/
 sdist/
 var/
 wheels/
-share/python-wheels/
+share/python-wheels
+data/
+models/
 *.egg-info/
 .installed.cfg
 *.egg
