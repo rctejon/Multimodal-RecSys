@@ -1,9 +1,6 @@
 import json
 from tqdm import tqdm
 import math
-
-import matplotlib.pyplot as plt
-
 import pickle
 import os
 
