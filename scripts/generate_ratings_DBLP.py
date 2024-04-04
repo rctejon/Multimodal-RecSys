@@ -2,6 +2,11 @@ import bigjson
 from tqdm import tqdm
 import os
 import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+from sklearn.model_selection import train_test_split
+import pickle
+
 
 citations_file_name = "data/DBLP_v12/dblp.v12.json"
 references_dict = {'id':[],
@@ -25,20 +30,57 @@ if not os.path.exists('data/DBLP_v12/papers_references.feather'):
         papers_references.to_feather("data/DBLP_v12/papers_references.feather")
 
 with open('data/DBLP_v12/papers_references.feather', 'rb') as f:
-    papers_references = pd.read_feather(f)
-    print(papers_references[papers_references['id'] < -1])
-    paper_with_references = papers_references[papers_references['references'] != -1]
-    paper_with_references['rating'] = 1
-    print(paper_with_references)
+    if not os.path.exists('data/DBLP_v12/valid_papers.feather'):
+        papers_references = pd.read_feather(f)
+        paper_with_references = papers_references[papers_references['references'] != -1]
+        paper_with_references['rating'] = 1
 
-    train = paper_with_references.sample(frac = 0.8)
-    test = paper_with_references.drop(train.index)
+        counts = paper_with_references.groupby(['id'])['references'].count()
 
-    train.reset_index(drop=True, inplace=True)
-    test.reset_index(drop=True, inplace=True)
+        index = counts[counts.between(5,100)].index.tolist()
 
-    # train.to_feather("data/DBLP_v12/papers_train.feather")
-    # test.to_feather("data/DBLP_v12/papers_test.feather")
+        print(len(index))
+        valid_papers = paper_with_references[paper_with_references['id'].isin(index)].reset_index(drop=True)
+
+        valid_papers.to_feather("data/DBLP_v12/valid_papers.feather")
+    else:
+        with open('data/DBLP_v12/valid_papers.feather', 'rb') as f2:
+            valid_papers = pd.read_feather(f2)
+groups = valid_papers.groupby(['id'])
+if not os.path.exists('data/DBLP_v12/train_index.pkl'):
+
+    train_index = []
+    test_index = []
+
+    for name, group in tqdm(groups, total=2794154):
+        train, test = train_test_split(group, test_size=0.3)
+
+        for index, row in train.iterrows():
+            train_index.append(index)
+        
+        for index, row in test.iterrows():
+            test_index.append(index)
+    with open('data/DBLP_v12/train_index.pkl', 'wb') as f:
+        pickle.dump(train_index, f)
+    with open('data/DBLP_v12/test_index.pkl', 'wb') as f:
+        pickle.dump(test_index, f)
+else:
+    with open('data/DBLP_v12/train_index.pkl', 'rb') as f:
+        train_index = pickle.load(f)
+    with open('data/DBLP_v12/test_index.pkl', 'rb') as f:
+        test_index = pickle.load(f)
+
+train_papers = valid_papers[valid_papers.index.isin(train_index)].reset_index(drop=True)
+test_papers = valid_papers[valid_papers.index.isin(test_index)].reset_index(drop=True)
+
+print(len(train_index))
+print(len(test_index))
+print(train_papers.shape)
+print(test_papers.shape)
+
+if not os.path.exists('data/DBLP_v12/papers_train.feather'):
+    train_papers.to_feather("data/DBLP_v12/papers_train.feather")
+    test_papers.to_feather("data/DBLP_v12/papers_test.feather")
 
 
 
