@@ -103,7 +103,8 @@ if __name__ == '__main__':
         help="save model or not")
     
     # set device and parameters
-    args = parser.parse_args("")
+    args = parser.parse_args()
+    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.out)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
