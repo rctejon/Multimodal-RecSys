@@ -1,5 +1,4 @@
 bigjson==1.0.9
-cartopy==0.22.0
 easynmt==2.0.2
 matplotlib==3.7.5
 mayavi==4.8.1
