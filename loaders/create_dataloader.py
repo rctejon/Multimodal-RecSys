@@ -2,6 +2,7 @@ from loaders.rating_dataset import RatingDataset
 from torch.utils.data import DataLoader
 import random
 import pandas as pd
+from tqdm import tqdm
 
 class CreateDataloader(object):
 	"""
@@ -17,7 +18,9 @@ class CreateDataloader(object):
 		self.user_pool = set(self.train_ratings['user_id'].unique())
 		self.item_pool = set(self.train_ratings['item_id'].unique())
 
+		print('negative sampling')
 		self.negatives = self._negative_sampling(self.train_ratings)
+		print('done')
 		random.seed(args.seed)
 
 	def _reindex(self, ratings):
@@ -42,22 +45,21 @@ class CreateDataloader(object):
 			.apply(set)
 			.reset_index()
 			.rename(columns={'item_id': 'interacted_items'}))
-		interact_status['negative_items'] = interact_status['interacted_items'].apply(lambda x: self.item_pool - x)
-		interact_status['negative_samples'] = interact_status['negative_items'].apply(lambda x: random.sample(x, self.num_ng_test))
-		return interact_status[['user_id', 'negative_items', 'negative_samples']]
+		interact_status['train_negative_samples'] = interact_status['interacted_items'].apply(lambda x: random.sample(self.item_pool - x, self.num_ng))
+		interact_status['test_negative_samples'] = interact_status['interacted_items'].apply(lambda x: random.sample(self.item_pool - x, self.num_ng_test))
+		return interact_status[['user_id', 'train_negative_samples', 'test_negative_samples']]
 
 	def get_train_instance(self):
 		users, items, ratings = [], [], []
-		train_ratings = pd.merge(self.train_ratings, self.negatives[['user_id', 'negative_items']], on='user_id')
-		train_ratings['negatives'] = train_ratings['negative_items'].apply(lambda x: random.sample(x, self.num_ng))
-		for row in train_ratings.itertuples():
+		train_ratings = pd.merge(self.train_ratings, self.negatives[['user_id', 'train_negative_samples']], on='user_id')
+		for row in tqdm(train_ratings.itertuples(), total=train_ratings.shape[0]):
 			users.append(int(row.user_id))
 			items.append(int(row.item_id))
 			ratings.append(float(row.rating))
-			for i in range(self.num_ng):
+			for i in getattr(row, 'train_negative_samples'):
 				users.append(int(row.user_id))
-				items.append(int(row.negatives[i]))
-				ratings.append(float(0))  # negative samples get 0 rating
+				items.append(int(i))
+				ratings.append(float(0))
 		dataset = RatingDataset(
 			user_list=users,
 			item_list=items,
@@ -66,12 +68,12 @@ class CreateDataloader(object):
 
 	def get_test_instance(self):
 		users, items, ratings = [], [], []
-		test_ratings = pd.merge(self.test_ratings, self.negatives[['user_id', 'negative_samples']], on='user_id')
-		for row in test_ratings.itertuples():
+		test_ratings = pd.merge(self.test_ratings, self.negatives[['user_id', 'test_negative_samples']], on='user_id')
+		for row in tqdm(test_ratings.itertuples(), total= test_ratings.shape[0]):
 			users.append(int(row.user_id))
 			items.append(int(row.item_id))
 			ratings.append(float(row.rating))
-			for i in getattr(row, 'negative_samples'):
+			for i in getattr(row, 'test_negative_samples'):
 				users.append(int(row.user_id))
 				items.append(int(i))
 				ratings.append(float(0))

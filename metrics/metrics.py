@@ -14,8 +14,15 @@ def ndcg(ng_item, pred_items):
 	return 0
 
 
+def mrr(ng_item, pred_items):
+	if ng_item in pred_items:
+		index = pred_items.index(ng_item)
+		return np.reciprocal(index+1)
+	return 0
+
+
 def metrics(model, test_loader, top_k, device):
-	HR, NDCG = [], []
+	HR, NDCG, MRR = [], [], []
 
 	for user, item, label in test_loader:
 		user = user.to(device)
@@ -29,5 +36,6 @@ def metrics(model, test_loader, top_k, device):
 		ng_item = item[0].item() # leave one-out evaluation has only one item per user
 		HR.append(hit(ng_item, recommends))
 		NDCG.append(ndcg(ng_item, recommends))
+		MRR.append(mrr(ng_item, recommends))
 
-	return np.mean(HR), np.mean(NDCG)
+	return np.mean(HR), np.mean(NDCG), np.mean(MRR)
