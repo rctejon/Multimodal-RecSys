@@ -148,11 +148,12 @@ if __name__ == '__main__':
         start_time = time.time()
 
         for user, item, label in tqdm(train_loader):
+            print(user.size(), item.size(), label.size())
+            print(user, item, label)
+            
             user = user.to(device)
             item = item.to(device)
             label = label.to(device)
-
-            print(device)
 
             optimizer.zero_grad()
             print('Zero Grad')
