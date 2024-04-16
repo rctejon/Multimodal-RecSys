@@ -122,15 +122,16 @@ if __name__ == '__main__':
     model = model.to(device)
 
 
-    HR, NDCG, MRR = metrics(model, test_loader, args.top_k, device, args.num_ng_test)
-    writer.add_scalar(f'Perfomance/HR@{args.top_k,}', HR, 10)
-    writer.add_scalar(f'Perfomance/NDCG@{args.top_k,}', NDCG, 10)
-    writer.add_scalar(f'Perfomance/MRR@{args.top_k,}', MRR, 10)
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 10, device, args.num_ng_test)
+    print("HR@10: {:.3f}\tNDCG@10: {:.3f}\tMRR@10: {:.3f} \tRECALL@10: {:.3f} \tPRECISION@10: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
+    
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 5, device, args.num_ng_test)
+    print("HR@5: {:.3f}\tNDCG@5: {:.3f}\tMRR@5: {:.3f} \tRECALL@5: {:.3f} \tPRECISION@5: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
 
-    elapsed_time = time.time() - start_time
-    print("The time elapse of epoch {:03d}".format(10) + " is: " +
-            time.strftime("%H: %M: %S", time.gmtime(elapsed_time)))
-    print("HR: {:.3f}\tNDCG: {:.3f}\tNDCG: {:.3f}".format(np.mean(HR), np.mean(NDCG), np.mean(MRR)))
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 3, device, args.num_ng_test)
+    print("HR@3: {:.3f}\tNDCG@3: {:.3f}\tMRR@3: {:.3f} \tRECALL@3: {:.3f} \tPRECISION@3: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
 
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 1, device, args.num_ng_test)
+    print("HR@1: {:.3f}\tNDCG@1: {:.3f}\tMRR@1: {:.3f} \tRECALL@1: {:.3f} \tPRECISION@1: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
 
     writer.close()

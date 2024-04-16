@@ -36,9 +36,24 @@ def mrr(ng_items, pred_items):
 		return np.reciprocal(float(min_index+1))
 	return 0
 
+def recall(ng_items, pred_items):
+	recall = 0
+	for ng_item in ng_items:
+		if ng_item in pred_items:
+			recall += 1
+	return recall / len(ng_items)
+
+def precision(ng_items, pred_items):
+	precision = 0
+	for ng_item in ng_items:
+		if ng_item in pred_items:
+			precision += 1
+	return precision / len(pred_items)
+
 
 def metrics(model, test_loader, top_k, device, ng_num):
 	HR, NDCG, MRR = [], [], []
+	RECALL, PRECISION = [], []
 	
 	current_user = None
 	current_item = None
@@ -65,6 +80,8 @@ def metrics(model, test_loader, top_k, device, ng_num):
 			HR.append(hit(ng_items, recommends))
 			NDCG.append(ndcg(ng_items, recommends))
 			MRR.append(mrr(ng_items, recommends))
+			RECALL.append(recall(ng_items, recommends))
+			PRECISION.append(precision(ng_items, recommends))
 
 			current_user = user
 			current_item = item
@@ -75,7 +92,9 @@ def metrics(model, test_loader, top_k, device, ng_num):
 	HR.append(hit(ng_items, recommends))
 	NDCG.append(ndcg(ng_items, recommends))
 	MRR.append(mrr(ng_items, recommends))
-	return np.mean(HR), np.mean(NDCG), np.mean(MRR)
+	RECALL.append(recall(ng_items, recommends))
+	PRECISION.append(precision(ng_items, recommends))
+	return np.mean(HR), np.mean(NDCG), np.mean(MRR), np.mean(RECALL), np.mean(PRECISION)
 
 
 def calculate_metrics_user(model, device, user, item, label, top_k, ng_num=100):
