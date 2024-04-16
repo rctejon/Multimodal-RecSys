@@ -152,12 +152,19 @@ if __name__ == '__main__':
             item = item.to(device)
             label = label.to(device)
 
+            print(device)
+
             optimizer.zero_grad()
+            print('Zero Grad')
             prediction = model(user, item)
+            print('Prediction')
             loss = loss_function(prediction, label)
+            print('Loss')
             loss.backward()
+            print('Backward')
             optimizer.step()
-            writer.add_scalar('loss/Train_loss', loss.item(), epoch)
+            print('Step')
+        print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
 
         model.eval()
 
