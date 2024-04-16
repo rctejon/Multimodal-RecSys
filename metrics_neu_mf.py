@@ -5,24 +5,20 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from metrics.metrics import metrics
 from architectures.NeuMF.neu_mf import NeuMF
 from loaders.create_dataloader import CreateDataloader
-from tqdm import tqdm
+import pickle
 
 def _reindex(ratings):
     """
     Process dataset to reindex userID and itemID, also set rating as binary feedback
     """
-    user_list = list(ratings['user_id'].drop_duplicates())
-    user2id = {w: i for i, w in enumerate(user_list)}
+    user2id = pickle.load(open(MAIN_PATH + 'user2id.pkl', 'rb'))
 
-    item_list = list(ratings['item_id'].drop_duplicates())
-    item2id = {w: i for i, w in enumerate(item_list)}
+    item2id = pickle.load(open(MAIN_PATH + 'item2id.pkl', 'rb'))
 
     ratings['user_id'] = ratings['user_id'].apply(lambda x: user2id[x])
     ratings['item_id'] = ratings['item_id'].apply(lambda x: item2id[x])
@@ -102,29 +98,20 @@ if __name__ == '__main__':
     seed_everything(args.seed)
 
     # load data
-    print(TRAIN_DATA_PATH)
+
     train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
-    test_rating_data = pd.read_feather(TEST_DATA_PATH)
-    print(train_rating_data.head())
-
     train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-
-    # set the num_users, items
-    num_users = train_rating_data['user_id'].nunique()+1
-    num_items = train_rating_data['item_id'].nunique()+1
-
-    print(num_users, num_items)
-
     train_rating_data = _reindex(train_rating_data)
+
+
+    test_rating_data = pd.read_feather(TEST_DATA_PATH)
+    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     test_rating_data = _reindex(test_rating_data)
 
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data)
-    print('Create Train Data Loader')
-    train_loader = data.get_train_instance()
+    data = CreateDataloader(args, test_rating_data, test_rating_data)
     print('Create Test Data Loader')
     test_loader = data.get_test_instance()
 
@@ -135,7 +122,7 @@ if __name__ == '__main__':
     model = model.to(device)
 
 
-    HR, NDCG, MRR = metrics(model, test_loader, args.top_k, device)
+    HR, NDCG, MRR = metrics(model, test_loader, args.top_k, device, args.num_ng_test)
     writer.add_scalar(f'Perfomance/HR@{args.top_k,}', HR, 10)
     writer.add_scalar(f'Perfomance/NDCG@{args.top_k,}', NDCG, 10)
     writer.add_scalar(f'Perfomance/MRR@{args.top_k,}', MRR, 10)

@@ -11,32 +11,18 @@ class CreateDataloader(object):
 	def __init__(self, args, train_ratings, test_ratings):
 		self.train_ratings = train_ratings
 		self.test_ratings = test_ratings
+		self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
 		self.num_ng = args.num_ng
 		self.num_ng_test = args.num_ng_test
 		self.batch_size = args.batch_size
 
-		self.user_pool = set(self.train_ratings['user_id'].unique())
-		self.item_pool = set(self.train_ratings['item_id'].unique())
+		self.user_pool = set(self.ratings['user_id'].unique())
+		self.item_pool = set(self.ratings['item_id'].unique())
 
 		print('negative sampling')
-		self.negatives = self._negative_sampling(self.train_ratings)
+		self.negatives = self._negative_sampling(self.ratings)
 		print('done')
 		random.seed(args.seed)
-
-	def _reindex(self, ratings):
-		"""
-		Process dataset to reindex userID and itemID, also set rating as binary feedback
-		"""
-		user_list = list(ratings['user_id'].drop_duplicates())
-		user2id = {w: i for i, w in enumerate(user_list)}
-
-		item_list = list(ratings['item_id'].drop_duplicates())
-		item2id = {w: i for i, w in enumerate(item_list)}
-
-		ratings['user_id'] = ratings['user_id'].apply(lambda x: user2id[x])
-		ratings['item_id'] = ratings['item_id'].apply(lambda x: item2id[x])
-		ratings['rating'] = ratings['rating'].apply(lambda x: float(x > 0))
-		return ratings
 
 
 	def _negative_sampling(self, ratings):
