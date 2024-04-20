@@ -75,16 +75,16 @@ if __name__ == '__main__':
         help="compute metrics@top_k")
     parser.add_argument("--factor_num",
         type=int,
-        default=32,
+        default=64,
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
-        default=[64,32,16,8],
+        default=[128,64,32,16,8],
         help="MLP layers. Note that the first layer is the concatenation of user \
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
         type=int,
-        default=4,
+        default=6,
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
@@ -163,6 +163,8 @@ if __name__ == '__main__':
             # print('Backward')
             optimizer.step()
             # print('Step')
+        if loss.item() < 0.001:
+            break
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time()-start_time))
 
