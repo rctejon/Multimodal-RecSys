@@ -143,11 +143,11 @@ if __name__ == '__main__':
     best_hr = 0
     for epoch in range(1, args.epochs+1):
         model.train() # Enable dropout (if have).
-        # start_time = time.time()
+        start_time = time.time()
 
         for user, item, label in tqdm(train_loader):
-            print(user.size(), item.size(), label.size())
-            print(user, item, label)
+            # print(user.size(), item.size(), label.size())
+            # print(user, item, label)
             
             user = user.to(device)
             item = item.to(device)
@@ -164,6 +164,7 @@ if __name__ == '__main__':
             optimizer.step()
             # print('Step')
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
+        print('epoch time: {:.4f}s'.format(time.time()-start_time))
 
         model.eval()
 
