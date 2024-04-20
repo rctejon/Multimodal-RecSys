@@ -88,7 +88,7 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=100,
+        default=0,
         help="Number of negative samples for test set")
     parser.add_argument("--out",
         default=True,
@@ -130,8 +130,6 @@ if __name__ == '__main__':
     data = CreateDataloader(args, train_rating_data, test_rating_data)
     print('Create Train Data Loader')
     train_loader = data.get_train_instance()
-    print('Create Test Data Loader')
-    test_loader = data.get_test_instance()
 
     # set model and loss, optimizer
     model = NeuMF(args, num_users, num_items)
@@ -145,7 +143,7 @@ if __name__ == '__main__':
     best_hr = 0
     for epoch in range(1, args.epochs+1):
         model.train() # Enable dropout (if have).
-        start_time = time.time()
+        # start_time = time.time()
 
         for user, item, label in tqdm(train_loader):
             print(user.size(), item.size(), label.size())
@@ -156,15 +154,15 @@ if __name__ == '__main__':
             label = label.to(device)
 
             optimizer.zero_grad()
-            print('Zero Grad')
+            # print('Zero Grad')
             prediction = model(user, item)
-            print('Prediction')
+            # print('Prediction')
             loss = loss_function(prediction, label)
-            print('Loss')
+            # print('Loss')
             loss.backward()
-            print('Backward')
+            # print('Backward')
             optimizer.step()
-            print('Step')
+            # print('Step')
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
 
         model.eval()
