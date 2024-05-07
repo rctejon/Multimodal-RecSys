@@ -4,9 +4,9 @@ from architectures.mlp import MultiLayerPerceptron
 from architectures.generalized_matrix_factorization import GeneralizedMatrixFactorization
 
 
-class NeuMF(nn.Module):
+class BertMF(nn.Module):
     def __init__(self, args, num_users, num_items):
-        super(NeuMF, self).__init__()
+        super(BertMF, self).__init__()
         self.num_users = num_users
         self.num_items = num_items
         self.factor_num_mf = args.factor_num
@@ -16,8 +16,13 @@ class NeuMF(nn.Module):
 
         self.mlp = MultiLayerPerceptron(num_users, num_items, self.factor_num_mlp, self.layers)
         self.gmf = GeneralizedMatrixFactorization(num_users, num_items, self.factor_num_mf)
+        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', '../transformers/BERT/tokenizer/')
+        self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', '../transformers/BERT/model/')
 
-        self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf, out_features=1)
+        for param in self.bert.parameters():
+            param.requires_grad = False
+
+        self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + self.bert.config.hidden_size, out_features=1)
         self.logistic = nn.Sigmoid()
         self.init_weight()
 
@@ -31,14 +36,15 @@ class NeuMF(nn.Module):
             if isinstance(m, nn.Linear) and m.bias is not None:
                 m.bias.data.zero_()
 
-    def forward(self, user_indices, item_indices):
+    def forward(self, user_indices, item_indices, texts):
         mlp_vector = self.mlp(user_indices, item_indices)
         mf_vector = self.gmf(user_indices, item_indices)
-        # mlp_vector = torch.rand(len(user_indices), self.layers[-1]).to('cuda:0')
-        
-        # mf_vector = torch.rand(len(user_indices), self.factor_num_mf).to('cuda:0')
 
-        vector = torch.cat([mlp_vector, mf_vector], dim=-1)
+        tokenizations = self.tokenizer(texts, return_tensors='pt', padding='max_length', max_length=64, truncation=True).to('cuda:0')
+
+        bert_vector = self.bert(**tokenizations).pooler_output
+
+        vector = torch.cat([mlp_vector, mf_vector, bert_vector], dim=1)
 
         logits = self.affine_output(vector)
         rating = self.logistic(logits)

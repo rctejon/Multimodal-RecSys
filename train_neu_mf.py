@@ -84,7 +84,7 @@ if __name__ == '__main__':
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
         type=int,
-        default=6,
+        default=20,
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
@@ -132,7 +132,8 @@ if __name__ == '__main__':
     train_loader = data.get_train_instance()
 
     # set model and loss, optimizer
-    model = NeuMF(args, num_users, num_items)
+    # model = NeuMF(args, num_users, num_items)
+    model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
     model = model.to(device)
     print(model)
     loss_function = nn.BCELoss()
@@ -163,10 +164,11 @@ if __name__ == '__main__':
             # print('Backward')
             optimizer.step()
             # print('Step')
-        if loss.item() < 0.001:
-            break
+
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time()-start_time))
+        if loss.item() < 0.001:
+            break
 
         model.eval()
 

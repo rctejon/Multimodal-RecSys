@@ -26,13 +26,13 @@ def ndcg(ng_items, pred_items):
 
 
 def mrr(ng_items, pred_items):
-	min_index = 999
+	min_index = 99999
 	for ng_item in ng_items:
 		if ng_item in pred_items:
 			index = pred_items.index(ng_item)
 			if index < min_index:
 				min_index = index
-	if min_index != 999:
+	if min_index != 99999:
 		return np.reciprocal(float(min_index+1))
 	return 0
 
@@ -60,7 +60,7 @@ def metrics(model, test_loader, top_k, device, ng_num):
 	current_label = None
 
 	current_user_id = None
-	for user, item, label in tqdm(test_loader, total=len(test_loader)):
+	for user, item, label, text in tqdm(test_loader, total=len(test_loader)):
 		user = user.cpu()
 		item = item.cpu()
 		label = label.cpu()
@@ -69,17 +69,20 @@ def metrics(model, test_loader, top_k, device, ng_num):
 			current_user = user
 			current_item = item
 			current_label = label
+			current_text = text
 
 			current_user_id = user.numpy()[0]
 		elif current_user_id == user.numpy()[0]:
 			current_user = torch.cat((current_user, user), 0)
 			current_item = torch.cat((current_item, item), 0)
 			current_label = torch.cat((current_label, label), 0)
+			if text is not None:
+				current_text += text 
 		else:
-			ng_items, recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, top_k, ng_num)
+			ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
 			HR.append(hit(ng_items, recommends))
 			NDCG.append(ndcg(ng_items, recommends))
-			MRR.append(mrr(ng_items, recommends))
+			MRR.append(mrr(ng_items, mrr_recommends))
 			RECALL.append(recall(ng_items, recommends))
 			PRECISION.append(precision(ng_items, recommends))
 
@@ -88,23 +91,25 @@ def metrics(model, test_loader, top_k, device, ng_num):
 			current_label = label
 
 			current_user_id = user.numpy()[0]
-	ng_items, recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, top_k, ng_num)
+	ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
 	HR.append(hit(ng_items, recommends))
 	NDCG.append(ndcg(ng_items, recommends))
-	MRR.append(mrr(ng_items, recommends))
+	MRR.append(mrr(ng_items, mrr_recommends))
 	RECALL.append(recall(ng_items, recommends))
 	PRECISION.append(precision(ng_items, recommends))
 	return np.mean(HR), np.mean(NDCG), np.mean(MRR), np.mean(RECALL), np.mean(PRECISION)
 
 
-def calculate_metrics_user(model, device, user, item, label, top_k, ng_num=100):
+def calculate_metrics_user(model, device, user, item, label, text, top_k, ng_num=100):
 	user = user.to(device)
 	item = item.to(device)
 	label = label.to(device)
-
-	predictions = model(user, item)
+	
+	predictions = model(user, item, text) if text is not None else model(user, item)
 	_, indices = torch.topk(predictions, top_k)
 	recommends = torch.take(item, indices).cpu().numpy().tolist()
+	_, mrr_indices = torch.topk(predictions, len(predictions))
+	mrr_recommends = torch.take(item, mrr_indices).cpu().numpy().tolist()
 
 	ng_items = []
 
@@ -112,4 +117,4 @@ def calculate_metrics_user(model, device, user, item, label, top_k, ng_num=100):
 		if label[i].item() == 1:
 			ng_item = item[i].item()
 			ng_items.append(ng_item)
-	return ng_items, recommends
+	return ng_items, recommends, mrr_recommends
