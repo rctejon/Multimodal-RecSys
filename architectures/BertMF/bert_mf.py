@@ -16,8 +16,8 @@ class BertMF(nn.Module):
 
         self.mlp = MultiLayerPerceptron(num_users, num_items, self.factor_num_mlp, self.layers)
         self.gmf = GeneralizedMatrixFactorization(num_users, num_items, self.factor_num_mf)
-        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', '../transformers/BERT/tokenizer/')
-        self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', '../transformers/BERT/model/')
+        self.tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+        self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', './transformers/BERT/model/')
 
         for param in self.bert.parameters():
             param.requires_grad = False
