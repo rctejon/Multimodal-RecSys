@@ -103,6 +103,10 @@ if __name__ == '__main__':
         type=int,
         default=100,
         help="Number of negative samples for test set")
+    parser.add_argument("--token_size",
+        type=int,
+        default=16,
+        help="size of the max token size")
     parser.add_argument("--out",
         default=True,
         help="save model or not")
