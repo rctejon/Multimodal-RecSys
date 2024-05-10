@@ -172,3 +172,6 @@ runs
 
 transformers/
 .vscode/
+nohup.out
+torchvenv/
+vsftpd
