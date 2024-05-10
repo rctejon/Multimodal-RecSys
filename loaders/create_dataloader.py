@@ -22,13 +22,13 @@ class CreateDataloader(object):
 		self.dataset_path = dataset_path
 		self.with_text = with_text
 
-		if self.with_text and not os.path.exists(f'{self.dataset_path}/train_texts_{self.num_ng}.pkl'):
+		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_texts_{self.num_ng}.pkl'):
 			self.texts = texts
 
 		self.user_pool = set(self.ratings['user_id'].unique())
 		self.item_pool = set(self.ratings['item_id'].unique())
 
-		if not os.path.exists(f'{self.dataset_path}/train_users_{self.num_ng}.pkl'):
+		if not os.path.exists(f'{self.dataset_path}/test_users_{self.num_ng}.pkl'):
 			print('negative sampling')
 			self.negatives = self._negative_sampling(self.ratings)
 			print('done')

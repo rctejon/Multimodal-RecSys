@@ -112,7 +112,7 @@ if __name__ == '__main__':
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, test_rating_data, test_rating_data)
+    data = CreateDataloader(args, test_rating_data, test_rating_data, MAIN_PATH)
     print('Create Test Data Loader')
     test_loader = data.get_test_instance()
 

@@ -84,11 +84,11 @@ if __name__ == '__main__':
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
         type=int,
-        default=20,
+        default=4,
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=0,
+        default=100,
         help="Number of negative samples for test set")
     parser.add_argument("--out",
         default=True,
@@ -127,13 +127,13 @@ if __name__ == '__main__':
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data)
+    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH)
     print('Create Train Data Loader')
     train_loader = data.get_train_instance()
 
     # set model and loss, optimizer
-    # model = NeuMF(args, num_users, num_items)
-    model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
+    model = NeuMF(args, num_users, num_items)
+    # model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
     model = model.to(device)
     print(model)
     loss_function = nn.BCELoss()
@@ -146,7 +146,7 @@ if __name__ == '__main__':
         model.train() # Enable dropout (if have).
         start_time = time.time()
 
-        for user, item, label in tqdm(train_loader):
+        for user, item, label, _ in tqdm(train_loader):
             # print(user.size(), item.size(), label.size())
             # print(user, item, label)
             
