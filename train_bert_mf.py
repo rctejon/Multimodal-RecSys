@@ -124,6 +124,9 @@ if __name__ == '__main__':
         type=int,
         default=16,
         help="size of the max token size")
+    parser.add_argument("--bert_path",
+        default='./transformers/BERT/model/',
+        help="path to the bert model")
     parser.add_argument("--out",
         default=True,
         help="save model or not")
