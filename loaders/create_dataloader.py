@@ -1,5 +1,6 @@
 from loaders.rating_dataset import RatingDataset
 from torch.utils.data import DataLoader
+from transformers import BatchEncoding
 import torch
 import random
 import pandas as pd
@@ -11,7 +12,7 @@ class CreateDataloader(object):
 	"""
 	Construct Dataloaders
 	"""
-	def __init__(self, args, train_ratings, test_ratings, dataset_path, with_text=False, texts=None):
+	def __init__(self, args, train_ratings, test_ratings, dataset_path, with_text=False, tokenizations=None):
 		self.train_ratings = train_ratings
 		self.test_ratings = test_ratings
 		self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
@@ -22,8 +23,8 @@ class CreateDataloader(object):
 		self.dataset_path = dataset_path
 		self.with_text = with_text
 
-		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_texts_{self.num_ng_test}.pkl'):
-			self.texts = texts
+		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
+			self.tokenizations = tokenizations
 
 		self.user_pool = set(self.ratings['user_id'].unique())
 		self.item_pool = set(self.ratings['item_id'].unique())
@@ -46,11 +47,17 @@ class CreateDataloader(object):
 	
 	
 	def collate_fn(self, batch):
+		if self.with_text:
+			input_ids = torch.cat(tuple(map(lambda x: x[3]['input_ids'], batch)), dim=0)
+			attention_mask = torch.cat(tuple(map(lambda x: x[3]['attention_mask'], batch)), dim=0)
+			token_type_ids = torch.cat(tuple(map(lambda x: x[3]['token_type_ids'], batch)), dim=0)
+
+			encoded_inputs = BatchEncoding({'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids': token_type_ids})
 		return (
 			torch.stack([x[0] for x in batch]),
 			torch.stack([x[1] for x in batch]),
 			torch.stack([x[2] for x in batch]),
-			[x[3] for x in batch] if self.with_text else None,
+			encoded_inputs if self.with_text else None,
 		)
 
 	def get_train_instance(self):
@@ -74,30 +81,30 @@ class CreateDataloader(object):
 			ratings = pickle.load(open(f'{self.dataset_path}/train_ratings_{self.num_ng}.pkl', 'rb'))
 
 		if self.with_text:
-			text_list = self._get_train_texts()
+			tokenization_list = self._get_train_tokenizations()
 			dataset = RatingDataset(
 				user_list=users,
 				item_list=items,
 				rating_list=ratings,
-				text_list=text_list)
+				tokenization_list=tokenization_list)
 		else:
 			dataset = RatingDataset(
 				user_list=users,
 				item_list=items,
 				rating_list=ratings)
 			
-		return DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=4, collate_fn=self.collate_fn)
+		return DataLoader(dataset, batch_size=self.batch_size, shuffle=True, num_workers=0, collate_fn=self.collate_fn)
 	
-	def _get_train_texts(self):
-		texts = []
-		if not os.path.exists(f'{self.dataset_path}/train_texts_{self.num_ng}.pkl'):
+	def _get_train_tokenizations(self):
+		tokenizations = []
+		if not os.path.exists(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl'):
 			items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
 			for item in tqdm(items, total=len(items)):
-				texts.append(self.texts.iloc[item]['text'])
-			pickle.dump(texts, open(f'{self.dataset_path}/train_texts_{self.num_ng}.pkl', 'wb'))
+				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
+			pickle.dump(tokenizations, open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl', 'wb'))
 		else:
-			texts = pickle.load(open(f'{self.dataset_path}/train_texts_{self.num_ng}.pkl', 'rb'))
-		return texts
+			tokenizations = pickle.load(open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl', 'rb'))
+		return tokenizations
 
 
 	def get_test_instance(self):
@@ -121,12 +128,12 @@ class CreateDataloader(object):
 			ratings = pickle.load(open(f'{self.dataset_path}/test_ratings_{self.num_ng_test}.pkl', 'rb'))
 
 		if self.with_text:
-			text_list = self._get_test_texts()
+			tokenization_list = self._get_test_tokenizations()
 			dataset = RatingDataset(
 				user_list=users,
 				item_list=items,
 				rating_list=ratings,
-				text_list=text_list)
+				tokenization_list=tokenization_list)
 		else:
 			dataset = RatingDataset(
 				user_list=users,
@@ -136,12 +143,12 @@ class CreateDataloader(object):
 		return DataLoader(dataset, batch_size=self.num_ng_test+1, shuffle=False, num_workers=12, collate_fn=self.collate_fn)
 	
 	def _get_test_texts(self):
-		texts = []
-		if not os.path.exists(f'{self.dataset_path}/test_texts_{self.num_ng_test}.pkl'):
+		tokenizations = []
+		if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
 			items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
 			for item in tqdm(items, total=len(items)):
-				texts.append(self.texts.iloc[item]['text'])
-			pickle.dump(texts, open(f'{self.dataset_path}/test_texts_{self.num_ng_test}.pkl', 'wb'))
+				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
+			pickle.dump(tokenizations, open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl', 'wb'))
 		else:
-			texts = pickle.load(open(f'{self.dataset_path}/test_texts_{self.num_ng_test}.pkl', 'rb'))
-		return texts
+			tokenizations = pickle.load(open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl', 'rb'))
+		return tokenizations

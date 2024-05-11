@@ -51,9 +51,15 @@ def precision(ng_items, pred_items):
 	return precision / len(pred_items)
 
 
-def metrics(model, test_loader, top_k, device, ng_num):
-	HR, NDCG, MRR = [], [], []
-	RECALL, PRECISION = [], []
+def metrics(model, test_loader, top_ks, device, ng_num):
+	HR, NDCG, MRR = {}, {}, []
+	RECALL, PRECISION = {}, {}
+
+	for top_k in top_ks:
+		HR[top_k] = []
+		NDCG[top_k] = []
+		RECALL[top_k] = []
+		PRECISION[top_k] = []
 	
 	current_user = None
 	current_item = None
@@ -79,25 +85,35 @@ def metrics(model, test_loader, top_k, device, ng_num):
 			if text is not None:
 				current_text += text 
 		else:
-			ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
-			HR.append(hit(ng_items, recommends))
-			NDCG.append(ndcg(ng_items, recommends))
+			for top_k in top_ks:
+				ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
+				HR[top_k].append(hit(ng_items, recommends))
+				NDCG[top_k].append(ndcg(ng_items, recommends))
+				RECALL[top_k].append(recall(ng_items, recommends))
+				PRECISION[top_k].append(precision(ng_items, recommends))
 			MRR.append(mrr(ng_items, mrr_recommends))
-			RECALL.append(recall(ng_items, recommends))
-			PRECISION.append(precision(ng_items, recommends))
 
 			current_user = user
 			current_item = item
 			current_label = label
+			current_text = text
 
 			current_user_id = user.numpy()[0]
-	ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
-	HR.append(hit(ng_items, recommends))
-	NDCG.append(ndcg(ng_items, recommends))
+	for top_k in top_ks:
+		ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
+		HR[top_k].append(hit(ng_items, recommends))
+		NDCG[top_k].append(ndcg(ng_items, recommends))
+		RECALL[top_k].append(recall(ng_items, recommends))
+		PRECISION[top_k].append(precision(ng_items, recommends))
+
+		HR[top_k] = np.mean(HR[top_k])
+		NDCG[top_k] = np.mean(NDCG[top_k])
+		RECALL[top_k] = np.mean(RECALL[top_k])
+		PRECISION[top_k] = np.mean(PRECISION[top_k])
 	MRR.append(mrr(ng_items, mrr_recommends))
-	RECALL.append(recall(ng_items, recommends))
-	PRECISION.append(precision(ng_items, recommends))
-	return np.mean(HR), np.mean(NDCG), np.mean(MRR), np.mean(RECALL), np.mean(PRECISION)
+	MRR = np.mean(MRR)
+
+	return HR, NDCG, MRR, RECALL, PRECISION
 
 
 def calculate_metrics_user(model, device, user, item, label, text, top_k, ng_num=100):

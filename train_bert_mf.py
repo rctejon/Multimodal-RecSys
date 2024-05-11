@@ -14,8 +14,23 @@ from architectures.BertMF.bert_mf import BertMF
 from loaders.create_dataloader import CreateDataloader
 from tqdm import tqdm
 import pickle
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-def create_text_df():
+def tokenize(text, tokenizer, max_length):
+    """
+    Tokenize the text
+    """
+    tokenization = tokenizer(text, max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
+
+    tokenization = {
+        'input_ids': tokenization['input_ids'],
+        'attention_mask': tokenization['attention_mask'],
+        'token_type_ids': tokenization['token_type_ids']
+    }
+    return tokenization
+
+
+def create_text_df(tokenizer, max_length):
     """
     Create a dataframe from the text dictionary
     """
@@ -26,6 +41,8 @@ def create_text_df():
     text_df['course_id'] = text_df['course_id'].apply(lambda x: x.split('_')[-1])
     text_df['course_id'] = text_df['course_id'].astype(int)
     text_df['text'] = text_df['text'].astype(str)
+    text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
+    text_df.drop(columns=['text'], inplace=True)
     return text_df
 
 def _reindex(ratings):
@@ -88,11 +105,11 @@ if __name__ == '__main__':
         help="compute metrics@top_k")
     parser.add_argument("--factor_num",
         type=int,
-        default=64,
+        default=32,
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
-        default=[128,64,32,16,8],
+        default=[64,32,16,8],
         help="MLP layers. Note that the first layer is the concatenation of user \
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
@@ -121,22 +138,28 @@ if __name__ == '__main__':
     # seed for Reproducibility
     seed_everything(args.seed)
 
+    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+
     # load data
     print(TRAIN_DATA_PATH)
     train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
     test_rating_data = pd.read_feather(TEST_DATA_PATH)
     print(train_rating_data.head())
     print(train_rating_data.dtypes)
-
-    text_df = create_text_df()
+    print('Begin Tokenization')
+    text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
     print(text_df.head())
     print(text_df.dtypes)
 
     train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
     test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
 
-    train_rating_data['text'] = train_rating_data['text'].fillna('Description: ')
-    test_rating_data['text'] = test_rating_data['text'].fillna('Description: ')
+    default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
+
+    print(default_tokenization)
+
+    train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+    test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
 
     print(train_rating_data.head())
 
@@ -145,9 +168,11 @@ if __name__ == '__main__':
 
     ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
 
-    texts = ratings[['item_id', 'text']].drop_duplicates(subset=['item_id'])
-    texts.set_index('item_id', inplace=True)
-    texts
+    tokenizations = None
+
+    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}.pkl') and not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}.pkl'):
+        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+        tokenizations.set_index('item_id', inplace=True)
 
     # set the num_users, items
     num_users = ratings['user_id'].nunique()+1
@@ -161,7 +186,7 @@ if __name__ == '__main__':
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, texts)
+    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, tokenizations)
     print('Create Train Data Loader')
     train_loader = data.get_train_instance()
 
@@ -180,17 +205,18 @@ if __name__ == '__main__':
         model.train() # Enable dropout (if have).
         start_time = time.time()
 
-        for user, item, label, text in tqdm(train_loader):
+        for user, item, label, tokenization in tqdm(train_loader):
             # print(user.size(), item.size(), label.size())
             # print(user, item, label)
             
             user = user.to(device)
             item = item.to(device)
             label = label.to(device)
+            tokenization = tokenization.to(device)
 
             optimizer.zero_grad()
             # print('Zero Grad')
-            prediction = model(user, item, text)
+            prediction = model(user, item, tokenization)
             # print('Prediction')
             loss = loss_function(prediction, label)
             # print('Loss')
