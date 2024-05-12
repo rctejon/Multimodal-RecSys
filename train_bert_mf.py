@@ -122,7 +122,7 @@ if __name__ == '__main__':
         help="Number of negative samples for test set")
     parser.add_argument("--token_size",
         type=int,
-        default=16,
+        default=32,
         help="size of the max token size")
     parser.add_argument("--bert_path",
         default='./transformers/BERT/model/',
@@ -173,7 +173,7 @@ if __name__ == '__main__':
 
     tokenizations = None
 
-    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}.pkl') and not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}.pkl'):
+    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') and not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
         tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
         tokenizations.set_index('item_id', inplace=True)
 

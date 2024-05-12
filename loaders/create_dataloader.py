@@ -20,6 +20,7 @@ class CreateDataloader(object):
 		self.num_ng = args.num_ng
 		self.num_ng_test = args.num_ng_test
 		self.batch_size = args.batch_size
+		self.token_size = args.token_size
 		self.dataset_path = dataset_path
 		self.with_text = with_text
 
@@ -97,13 +98,13 @@ class CreateDataloader(object):
 	
 	def _get_train_tokenizations(self):
 		tokenizations = []
-		if not os.path.exists(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl'):
+		if not os.path.exists(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl'):
 			items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
 			for item in tqdm(items, total=len(items)):
 				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
-			pickle.dump(tokenizations, open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl', 'wb'))
+			pickle.dump(tokenizations, open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'wb'))
 		else:
-			tokenizations = pickle.load(open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}.pkl', 'rb'))
+			tokenizations = pickle.load(open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'rb'))
 		return tokenizations
 
 
@@ -144,11 +145,11 @@ class CreateDataloader(object):
 	
 	def _get_test_texts(self):
 		tokenizations = []
-		if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
+		if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
 			items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
 			for item in tqdm(items, total=len(items)):
 				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
-			pickle.dump(tokenizations, open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl', 'wb'))
+			pickle.dump(tokenizations, open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'wb'))
 		else:
-			tokenizations = pickle.load(open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl', 'rb'))
+			tokenizations = pickle.load(open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'rb'))
 		return tokenizations

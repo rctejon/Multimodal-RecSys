@@ -14,7 +14,21 @@ import pickle
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
-def create_text_df():
+def tokenize(text, tokenizer, max_length):
+    """
+    Tokenize the text
+    """
+    tokenization = tokenizer(text, max_length=max_length, padding='max_length', truncation=True, return_tensors='pt')
+
+    tokenization = {
+        'input_ids': tokenization['input_ids'],
+        'attention_mask': tokenization['attention_mask'],
+        'token_type_ids': tokenization['token_type_ids']
+    }
+    return tokenization
+
+
+def create_text_df(tokenizer, max_length):
     """
     Create a dataframe from the text dictionary
     """
@@ -25,7 +39,10 @@ def create_text_df():
     text_df['course_id'] = text_df['course_id'].apply(lambda x: x.split('_')[-1])
     text_df['course_id'] = text_df['course_id'].astype(int)
     text_df['text'] = text_df['text'].astype(str)
+    text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
+    text_df.drop(columns=['text'], inplace=True)
     return text_df
+
 
 def _reindex(ratings):
     """
@@ -107,6 +124,9 @@ if __name__ == '__main__':
         type=int,
         default=16,
         help="size of the max token size")
+    parser.add_argument("--bert_path",
+        default='./transformers/BERT/model/',
+        help="path to the bert model")
     
     # set device and parameters
     args = parser.parse_args()
@@ -114,23 +134,26 @@ if __name__ == '__main__':
     print(f"Using {device} device")
     writer = SummaryWriter()
 
+    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+
     # seed for Reproducibility
     seed_everything(args.seed)
 
     # load data
 
-    text_df = create_text_df()
+    text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
+    default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
 
     train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
     train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
-    train_rating_data['text'] = train_rating_data['text'].fillna('Description: ')
+    train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
     train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     
 
 
     test_rating_data = pd.read_feather(TEST_DATA_PATH)
     test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
-    test_rating_data['text'] = test_rating_data['text'].fillna('Description: ')
+    test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
     test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     
 
@@ -140,15 +163,15 @@ if __name__ == '__main__':
     test_rating_data = _reindex(test_rating_data)
 
     
-
-    texts = ratings[['item_id', 'text']].drop_duplicates(subset=['item_id'])
-    texts.set_index('item_id', inplace=True)
-    texts
+    tokenizations = None
+    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') and not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
+        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+        tokenizations.set_index('item_id', inplace=True)
 
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, texts)
+    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, tokenizations)
     print('Create Test Data Loader')
     test_loader = data.get_test_instance()
 
