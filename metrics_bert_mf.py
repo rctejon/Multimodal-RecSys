@@ -118,7 +118,7 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=50,
+        default=100,
         help="Number of negative samples for test set")
     parser.add_argument("--token_size",
         type=int,
@@ -134,40 +134,45 @@ if __name__ == '__main__':
     print(f"Using {device} device")
     writer = SummaryWriter()
 
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+    if  not os.path.exists(f'{MAIN_PATH}/test_users_{args.num_ng_test}.pkl'):
 
-    # seed for Reproducibility
-    seed_everything(args.seed)
+        tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
 
-    # load data
+        # seed for Reproducibility
+        seed_everything(args.seed)
 
-    text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
-    default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
+        # load data
 
-    train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
-    train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
-    train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
-    train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-    
+        text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
+        default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
+
+        train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
+        train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
+        train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+        train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
+        
 
 
-    test_rating_data = pd.read_feather(TEST_DATA_PATH)
-    test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
-    test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
-    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-    
+        test_rating_data = pd.read_feather(TEST_DATA_PATH)
+        test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
+        test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+        test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
+        
 
-    ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
+        ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
 
-    train_rating_data = _reindex(train_rating_data)
-    test_rating_data = _reindex(test_rating_data)
+        train_rating_data = _reindex(train_rating_data)
+        test_rating_data = _reindex(test_rating_data)
 
-    
-    tokenizations = None
-    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
-        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
-        tokenizations.set_index('item_id', inplace=True)
-
+        
+        tokenizations = None
+        if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
+            tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+            tokenizations.set_index('item_id', inplace=True)
+    else:
+        train_rating_data = None
+        test_rating_data = None
+        tokenizations = None
 
     # construct the train and test datasets
 

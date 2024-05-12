@@ -13,28 +13,28 @@ class CreateDataloader(object):
 	Construct Dataloaders
 	"""
 	def __init__(self, args, train_ratings, test_ratings, dataset_path, with_text=False, tokenizations=None):
-		self.train_ratings = train_ratings
-		self.test_ratings = test_ratings
-		self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
-		print(train_ratings.shape, test_ratings.shape, self.ratings.shape)
 		self.num_ng = args.num_ng
 		self.num_ng_test = args.num_ng_test
 		self.batch_size = args.batch_size
 		self.token_size = args.token_size
 		self.dataset_path = dataset_path
 		self.with_text = with_text
-
-		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
-			self.tokenizations = tokenizations
-
-		self.user_pool = set(self.ratings['user_id'].unique())
-		self.item_pool = set(self.ratings['item_id'].unique())
-
 		if not os.path.exists(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl'):
+			self.train_ratings = train_ratings
+			self.test_ratings = test_ratings
+			self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
+			print(train_ratings.shape, test_ratings.shape, self.ratings.shape)
+			self.user_pool = set(self.ratings['user_id'].unique())
+			self.item_pool = set(self.ratings['item_id'].unique())
 			print('negative sampling')
 			self.negatives = self._negative_sampling(self.ratings)
 			print('done')
+			
 		random.seed(args.seed)
+
+
+		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
+			self.tokenizations = tokenizations
 
 	def _negative_sampling(self, ratings):
 		interact_status = (
