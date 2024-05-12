@@ -118,7 +118,7 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=100,
+        default=50,
         help="Number of negative samples for test set")
     parser.add_argument("--token_size",
         type=int,
@@ -164,7 +164,7 @@ if __name__ == '__main__':
 
     
     tokenizations = None
-    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') and not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
+    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
         tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
         tokenizations.set_index('item_id', inplace=True)
 

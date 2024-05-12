@@ -141,7 +141,7 @@ class CreateDataloader(object):
 				item_list=items,
 				rating_list=ratings)
 		
-		return DataLoader(dataset, batch_size=self.num_ng_test+1, shuffle=False, num_workers=12, collate_fn=self.collate_fn)
+		return DataLoader(dataset, batch_size=self.num_ng_test+1, shuffle=False, num_workers=0, collate_fn=self.collate_fn)
 	
 	def _get_test_tokenizations(self):
 		tokenizations = []

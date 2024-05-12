@@ -1,6 +1,7 @@
 import numpy as np
 import torch
 from tqdm import tqdm
+from transformers import BatchEncoding
 
 def hit(ng_items, pred_items):
 	for ng_item in ng_items:
@@ -50,6 +51,13 @@ def precision(ng_items, pred_items):
 			precision += 1
 	return precision / len(pred_items)
 
+def combine_tokenization(t1, t2):
+		input_ids = torch.cat((t1['input_ids'], t2['input_ids']), dim=0)
+		attention_mask = torch.cat((t1['attention_mask'], t2['attention_mask']), dim=0)
+		token_type_ids = torch.cat((t1['token_type_ids'], t2['token_type_ids']), dim=0)
+
+		encoded_inputs = BatchEncoding({'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids': token_type_ids})
+		return encoded_inputs
 
 def metrics(model, test_loader, top_ks, device, ng_num):
 	HR, NDCG, MRR = {}, {}, []
@@ -66,7 +74,7 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 	current_label = None
 
 	current_user_id = None
-	for user, item, label, text in tqdm(test_loader, total=len(test_loader)):
+	for user, item, label, tokenization in tqdm(test_loader, total=len(test_loader)):
 		user = user.cpu()
 		item = item.cpu()
 		label = label.cpu()
@@ -75,18 +83,18 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 			current_user = user
 			current_item = item
 			current_label = label
-			current_text = text
+			current_tokenization = tokenization
 
 			current_user_id = user.numpy()[0]
 		elif current_user_id == user.numpy()[0]:
 			current_user = torch.cat((current_user, user), 0)
 			current_item = torch.cat((current_item, item), 0)
 			current_label = torch.cat((current_label, label), 0)
-			if text is not None:
-				current_text += text 
+			if tokenization is not None:
+				current_tokenization = combine_tokenization(current_tokenization, tokenization)
 		else:
 			for top_k in top_ks:
-				ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
+				ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_tokenization, top_k, ng_num)
 				HR[top_k].append(hit(ng_items, recommends))
 				NDCG[top_k].append(ndcg(ng_items, recommends))
 				RECALL[top_k].append(recall(ng_items, recommends))
@@ -96,11 +104,11 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 			current_user = user
 			current_item = item
 			current_label = label
-			current_text = text
+			current_tokenization = tokenization
 
 			current_user_id = user.numpy()[0]
 	for top_k in top_ks:
-		ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_text, top_k, ng_num)
+		ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_tokenization, top_k, ng_num)
 		HR[top_k].append(hit(ng_items, recommends))
 		NDCG[top_k].append(ndcg(ng_items, recommends))
 		RECALL[top_k].append(recall(ng_items, recommends))
@@ -116,12 +124,13 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 	return HR, NDCG, MRR, RECALL, PRECISION
 
 
-def calculate_metrics_user(model, device, user, item, label, text, top_k, ng_num=100):
+def calculate_metrics_user(model, device, user, item, label, tokenization, top_k, ng_num=100):
 	user = user.to(device)
 	item = item.to(device)
 	label = label.to(device)
+	tokenization = tokenization.to(device)
 	
-	predictions = model(user, item, text) if text is not None else model(user, item)
+	predictions = model(user, item, tokenization) if tokenization is not None else model(user, item)
 	_, indices = torch.topk(predictions, top_k)
 	recommends = torch.take(item, indices).cpu().numpy().tolist()
 	_, mrr_indices = torch.topk(predictions, len(predictions))
