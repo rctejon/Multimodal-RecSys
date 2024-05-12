@@ -143,7 +143,7 @@ class CreateDataloader(object):
 		
 		return DataLoader(dataset, batch_size=self.num_ng_test+1, shuffle=False, num_workers=12, collate_fn=self.collate_fn)
 	
-	def _get_test_texts(self):
+	def _get_test_tokenizations(self):
 		tokenizations = []
 		if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
 			items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
