@@ -122,20 +122,14 @@ if __name__ == '__main__':
     model = torch.load(MODEL_PATH)
     model = model.to(device)
 
-    print('Calculate Metrics for @10')
-    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 10, device, args.num_ng_test)
-    print("HR@10: {:.3f}\tNDCG@10: {:.3f}\tMRR@10: {:.3f} \tRECALL@10: {:.3f} \tPRECISION@10: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
-    
-    print('Calculate Metrics for @5')
-    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 5, device, args.num_ng_test)
-    print("HR@5: {:.3f}\tNDCG@5: {:.3f}\tMRR@5: {:.3f} \tRECALL@5: {:.3f} \tPRECISION@5: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
+    top_ks = [1, 3, 5, 10]
 
-    print('Calculate Metrics for @3')
-    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 3, device, args.num_ng_test)
-    print("HR@3: {:.3f}\tNDCG@3: {:.3f}\tMRR@3: {:.3f} \tRECALL@3: {:.3f} \tPRECISION@3: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
+    print('Calculate Metrics')
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, top_ks, device, args.num_ng_test)
 
-    print('Calculate Metrics for @1')
-    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, 1, device, args.num_ng_test)
-    print("HR@1: {:.3f}\tNDCG@1: {:.3f}\tMRR@1: {:.3f} \tRECALL@1: {:.3f} \tPRECISION@1: {:.3f}".format(HR, NDCG, MRR, RECALL, PRECISION))
+    print(f"MRR: {MRR}")
+
+    for top_k in top_ks:
+        print(f"HR@{top_k}: {HR[top_k]}\tNDGC@{top_k}: {NDCG[top_k]}\tRECALL@{top_k}: {RECALL[top_k]}\tPRECISION@{top_k}: {PRECISION[top_k]}")
 
     writer.close()

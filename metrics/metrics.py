@@ -74,7 +74,8 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 			user = user.to(device)
 			item = item.to(device)
 			label = label.to(device)
-			tokenization = tokenization.to(device)
+			if tokenization is not None:
+				tokenization = tokenization.to(device)
 			predictions = model(user, item, tokenization) if tokenization is not None else model(user, item)
 			for top_k in top_ks:
 				ng_items, recommends, mrr_recommends = calculate_metrics_user(predictions, device, user, item, label, tokenization, top_k, ng_num)
@@ -98,7 +99,8 @@ def calculate_metrics_user(predictions, device, user, item, label, tokenization,
 	user = user.to(device)
 	item = item.to(device)
 	label = label.to(device)
-	tokenization = tokenization.to(device)
+	if tokenization is not None:
+		tokenization = tokenization.to(device)
 	
 	_, indices = torch.topk(predictions, top_k)
 	recommends = torch.take(item, indices).cpu().numpy().tolist()
