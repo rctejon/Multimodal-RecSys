@@ -68,69 +68,38 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 		NDCG[top_k] = []
 		RECALL[top_k] = []
 		PRECISION[top_k] = []
-	
-	current_user = None
-	current_item = None
-	current_label = None
 
-	current_user_id = None
-	for user, item, label, tokenization in tqdm(test_loader, total=len(test_loader)):
-		user = user.cpu()
-		item = item.cpu()
-		label = label.cpu()
-		
-		if current_user == None:
-			current_user = user
-			current_item = item
-			current_label = label
-			current_tokenization = tokenization
-
-			current_user_id = user.numpy()[0]
-		elif current_user_id == user.numpy()[0]:
-			current_user = torch.cat((current_user, user), 0)
-			current_item = torch.cat((current_item, item), 0)
-			current_label = torch.cat((current_label, label), 0)
-			if tokenization is not None:
-				current_tokenization = combine_tokenization(current_tokenization, tokenization)
-		else:
+	with torch.no_grad():
+		for user, item, label, tokenization in tqdm(test_loader, total=len(test_loader)):
+			user = user.to(device)
+			item = item.to(device)
+			label = label.to(device)
+			tokenization = tokenization.to(device)
+			predictions = model(user, item, tokenization) if tokenization is not None else model(user, item)
 			for top_k in top_ks:
-				ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_tokenization, top_k, ng_num)
+				ng_items, recommends, mrr_recommends = calculate_metrics_user(predictions, device, user, item, label, tokenization, top_k, ng_num)
 				HR[top_k].append(hit(ng_items, recommends))
 				NDCG[top_k].append(ndcg(ng_items, recommends))
 				RECALL[top_k].append(recall(ng_items, recommends))
 				PRECISION[top_k].append(precision(ng_items, recommends))
 			MRR.append(mrr(ng_items, mrr_recommends))
 
-			current_user = user
-			current_item = item
-			current_label = label
-			current_tokenization = tokenization
-
-			current_user_id = user.numpy()[0]
 	for top_k in top_ks:
-		ng_items, recommends, mrr_recommends = calculate_metrics_user(model, device, current_user, current_item, current_label, current_tokenization, top_k, ng_num)
-		HR[top_k].append(hit(ng_items, recommends))
-		NDCG[top_k].append(ndcg(ng_items, recommends))
-		RECALL[top_k].append(recall(ng_items, recommends))
-		PRECISION[top_k].append(precision(ng_items, recommends))
-
 		HR[top_k] = np.mean(HR[top_k])
 		NDCG[top_k] = np.mean(NDCG[top_k])
 		RECALL[top_k] = np.mean(RECALL[top_k])
 		PRECISION[top_k] = np.mean(PRECISION[top_k])
-	MRR.append(mrr(ng_items, mrr_recommends))
 	MRR = np.mean(MRR)
 
 	return HR, NDCG, MRR, RECALL, PRECISION
 
 
-def calculate_metrics_user(model, device, user, item, label, tokenization, top_k, ng_num=100):
+def calculate_metrics_user(predictions, device, user, item, label, tokenization, top_k, ng_num=100):
 	user = user.to(device)
 	item = item.to(device)
 	label = label.to(device)
 	tokenization = tokenization.to(device)
 	
-	predictions = model(user, item, tokenization) if tokenization is not None else model(user, item)
 	_, indices = torch.topk(predictions, top_k)
 	recommends = torch.take(item, indices).cpu().numpy().tolist()
 	_, mrr_indices = torch.topk(predictions, len(predictions))
