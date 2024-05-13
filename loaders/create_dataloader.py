@@ -16,9 +16,12 @@ class CreateDataloader(object):
 		self.num_ng = args.num_ng
 		self.num_ng_test = args.num_ng_test
 		self.batch_size = args.batch_size
-		self.token_size = args.token_size
 		self.dataset_path = dataset_path
 		self.with_text = with_text
+
+		if self.with_text:
+			self.token_size = args.token_size
+
 		if not os.path.exists(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl'):
 			self.train_ratings = train_ratings
 			self.test_ratings = test_ratings
