@@ -36,7 +36,7 @@ class CreateDataloader(object):
 		random.seed(args.seed)
 
 
-		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}.pkl'):
+		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
 			self.tokenizations = tokenizations
 
 	def _negative_sampling(self, ratings):

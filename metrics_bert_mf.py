@@ -134,7 +134,7 @@ if __name__ == '__main__':
     print(f"Using {device} device")
     writer = SummaryWriter()
 
-    if  not os.path.exists(f'{MAIN_PATH}/test_users_{args.num_ng_test}.pkl'):
+    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
 
         tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
 
@@ -166,9 +166,8 @@ if __name__ == '__main__':
 
         
         tokenizations = None
-        if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
-            tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
-            tokenizations.set_index('item_id', inplace=True)
+        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+        tokenizations.set_index('item_id', inplace=True)
     else:
         train_rating_data = None
         test_rating_data = None
