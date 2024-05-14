@@ -18,6 +18,7 @@ class CreateDataloader(object):
 		self.batch_size = args.batch_size
 		self.dataset_path = dataset_path
 		self.with_text = with_text
+		self.train_bert = args.train_bert
 
 		if self.with_text:
 			self.token_size = args.token_size
@@ -35,9 +36,12 @@ class CreateDataloader(object):
 			
 		random.seed(args.seed)
 
-
-		if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
-			self.tokenizations = tokenizations
+		if not self.train_bert:
+			if self.with_text and not os.path.exists(f'{self.dataset_path}/test_embeddings_{self.num_ng}_{self.token_size}.pkl'):
+				self.tokenizations = tokenizations
+		else:
+			if self.with_text and not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
+				self.tokenizations = tokenizations
 
 	def _negative_sampling(self, ratings):
 		interact_status = (
@@ -51,7 +55,8 @@ class CreateDataloader(object):
 	
 	
 	def collate_fn(self, batch):
-		if self.with_text:
+		encoded_inputs = torch.cat([x[3] for x in batch]) if not self.train_bert else None
+		if self.with_text and self.train_bert:
 			input_ids = torch.cat(tuple(map(lambda x: x[3]['input_ids'], batch)), dim=0)
 			attention_mask = torch.cat(tuple(map(lambda x: x[3]['attention_mask'], batch)), dim=0)
 			token_type_ids = torch.cat(tuple(map(lambda x: x[3]['token_type_ids'], batch)), dim=0)
@@ -101,13 +106,23 @@ class CreateDataloader(object):
 	
 	def _get_train_tokenizations(self):
 		tokenizations = []
-		if not os.path.exists(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl'):
-			items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
-			for item in tqdm(items, total=len(items)):
-				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
-			pickle.dump(tokenizations, open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'wb'))
+		if not self.train_bert:
+			if not os.path.exists(f'{self.dataset_path}/train_embeddings_{self.num_ng}_{self.token_size}.pkl'):
+				items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
+				for item in tqdm(items, total=len(items)):
+					tokenizations.append(self.tokenizations.iloc[item]['embedding'])
+				pickle.dump(tokenizations, open(f'{self.dataset_path}/train_embeddings_{self.num_ng}_{self.token_size}.pkl', 'wb'))
+			else:
+				tokenizations = pickle.load(open(f'{self.dataset_path}/train_embeddings_{self.num_ng}_{self.token_size}.pkl', 'rb'))
+
 		else:
-			tokenizations = pickle.load(open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'rb'))
+			if not os.path.exists(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl'):
+				items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
+				for item in tqdm(items, total=len(items)):
+					tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
+				pickle.dump(tokenizations, open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'wb'))
+			else:
+				tokenizations = pickle.load(open(f'{self.dataset_path}/train_tokenizations_{self.num_ng}_{self.token_size}.pkl', 'rb'))
 		return tokenizations
 
 
@@ -148,11 +163,20 @@ class CreateDataloader(object):
 	
 	def _get_test_tokenizations(self):
 		tokenizations = []
-		if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
-			items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
-			for item in tqdm(items, total=len(items)):
-				tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
-			pickle.dump(tokenizations, open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'wb'))
+		if not self.train_bert:
+			if not os.path.exists(f'{self.dataset_path}/test_embeddings_{self.num_ng_test}_{self.token_size}.pkl'):
+				items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
+				for item in tqdm(items, total=len(items)):
+					tokenizations.append(self.tokenizations.iloc[item]['embedding'])
+				pickle.dump(tokenizations, open(f'{self.dataset_path}/test_embeddings_{self.num_ng_test}_{self.token_size}.pkl', 'wb'))
+			else:
+				tokenizations = pickle.load(open(f'{self.dataset_path}/test_embeddings_{self.num_ng_test}_{self.token_size}.pkl', 'rb'))
 		else:
-			tokenizations = pickle.load(open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'rb'))
+			if not os.path.exists(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl'):
+				items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
+				for item in tqdm(items, total=len(items)):
+					tokenizations.append(self.tokenizations.iloc[item]['tokenization'])
+				pickle.dump(tokenizations, open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'wb'))
+			else:
+				tokenizations = pickle.load(open(f'{self.dataset_path}/test_tokenizations_{self.num_ng_test}_{self.token_size}.pkl', 'rb'))
 		return tokenizations

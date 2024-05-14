@@ -29,8 +29,18 @@ def tokenize(text, tokenizer, max_length):
     }
     return tokenization
 
+def get_bert_embedding(text, tokenizer, model, max_length=32, device='cuda:0'):
+    """
+    Get the bert embeddings
+    """
+    model.to(device)
+    tokenization = tokenizer(text, max_length=max_length, padding='max_length', truncation=True, return_tensors='pt').to(device)
+    with torch.no_grad():
+        embedding = model(**tokenization).pooler_output.to('cpu')
+    return embedding
 
-def create_text_df(tokenizer, max_length):
+
+def create_text_df(tokenizer, max_length, train_bert, model = None, device='cuda:0'):
     """
     Create a dataframe from the text dictionary
     """
@@ -41,7 +51,10 @@ def create_text_df(tokenizer, max_length):
     text_df['course_id'] = text_df['course_id'].apply(lambda x: x.split('_')[-1])
     text_df['course_id'] = text_df['course_id'].astype(int)
     text_df['text'] = text_df['text'].astype(str)
-    text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
+    if not train_bert:
+        text_df['embedding'] = text_df['text'].apply(lambda x: get_bert_embedding(x, tokenizer, model, max_length, device))
+    else:
+        text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
     text_df.drop(columns=['text'], inplace=True)
     return text_df
 
@@ -122,26 +135,29 @@ if __name__ == '__main__':
         help="Number of negative samples for test set")
     parser.add_argument("--token_size",
         type=int,
-        default=32,
+        default=64,
         help="size of the max token size")
     parser.add_argument("--bert_path",
         default='./transformers/BERT/model/',
         help="path to the bert model")
-    parser.add_argument("--out",
-        default=True,
-        help="save model or not")
+    parser.add_argument("--train_bert",
+        default=False,
+        help="train bert")
     
     # set device and parameters
     args = parser.parse_args()
-    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.out)
+    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.train_bert)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
+
+    text_column = 'embedding' if not args.train_bert else 'tokenization'
 
     # seed for Reproducibility
     seed_everything(args.seed)
 
     tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+    bert_model = torch.hub.load('huggingface/pytorch-transformers', 'model', args.bert_path)
 
     # load data
     print(TRAIN_DATA_PATH)
@@ -150,19 +166,22 @@ if __name__ == '__main__':
     print(train_rating_data.head())
     print(train_rating_data.dtypes)
     print('Begin Tokenization')
-    text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
+    text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size, train_bert=args.train_bert, model=bert_model, device=device)
     print(text_df.head())
     print(text_df.dtypes)
 
     train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
     test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
 
-    default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
+    default_row = tokenize('Description: ', tokenizer, args.token_size)
 
-    print(default_tokenization)
+    if not args.train_bert:
+        default_row = get_bert_embedding('Description: ', tokenizer, bert_model, args.token_size, device)
 
-    train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
-    test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+    print(default_row)
+
+    train_rating_data[text_column] = train_rating_data[text_column].apply(lambda x: default_row if type(x) == float else x)
+    test_rating_data[text_column] = test_rating_data[text_column].apply(lambda x: default_row if type(x) == float else x)
 
     print(train_rating_data.head())
 
@@ -173,9 +192,15 @@ if __name__ == '__main__':
 
     tokenizations = None
 
-    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
-        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
-        tokenizations.set_index('item_id', inplace=True)
+    if not args.train_bert:
+        if not os.path.exists(f'{MAIN_PATH}/test_embeddings_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_embeddings_{args.num_ng}_{args.token_size}.pkl'):
+            tokenizations = ratings[['item_id', 'embedding']].drop_duplicates(subset=['item_id'])
+            tokenizations.set_index('item_id', inplace=True)
+
+    else:
+        if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
+            tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+            tokenizations.set_index('item_id', inplace=True)
 
     # set the num_users, items
     num_users = ratings['user_id'].nunique()+1

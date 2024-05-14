@@ -27,8 +27,18 @@ def tokenize(text, tokenizer, max_length):
     }
     return tokenization
 
+def get_bert_embedding(text, tokenizer, model, max_length=32, device='cuda:0'):
+    """
+    Get the bert embeddings
+    """
+    model.to(device)
+    tokenization = tokenizer(text, max_length=max_length, padding='max_length', truncation=True, return_tensors='pt').to(device)
+    with torch.no_grad():
+        embedding = model(**tokenization).pooler_output.to('cpu')
+    return embedding
 
-def create_text_df(tokenizer, max_length):
+
+def create_text_df(tokenizer, max_length, train_bert, model = None, device='cuda:0'):
     """
     Create a dataframe from the text dictionary
     """
@@ -39,7 +49,10 @@ def create_text_df(tokenizer, max_length):
     text_df['course_id'] = text_df['course_id'].apply(lambda x: x.split('_')[-1])
     text_df['course_id'] = text_df['course_id'].astype(int)
     text_df['text'] = text_df['text'].astype(str)
-    text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
+    if not train_bert:
+        text_df['embedding'] = text_df['text'].apply(lambda x: get_bert_embedding(x, tokenizer, model, max_length, device))
+    else:
+        text_df['tokenization'] = text_df['text'].apply(lambda x: tokenize(x, tokenizer, max_length))
     text_df.drop(columns=['text'], inplace=True)
     return text_df
 
@@ -127,6 +140,9 @@ if __name__ == '__main__':
     parser.add_argument("--bert_path",
         default='./transformers/BERT/model/',
         help="path to the bert model")
+    parser.add_argument("--train_bert",
+        default=False,
+        help="train the bert model")
     
     # set device and parameters
     args = parser.parse_args()
@@ -134,28 +150,38 @@ if __name__ == '__main__':
     print(f"Using {device} device")
     writer = SummaryWriter()
 
-    if not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl'):
+    text_column = 'embedding' if not args.train_bert else 'tokenization'
+
+    do_precalc = not os.path.exists(f'{MAIN_PATH}/test_tokenizations_{args.num_ng_test}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_tokenizations_{args.num_ng}_{args.token_size}.pkl')
+
+    if not args.train_bert:
+        do_precalc = not os.path.exists(f'{MAIN_PATH}/test_embeddings_{args.num_ng}_{args.token_size}.pkl') or not os.path.exists(f'{MAIN_PATH}/train_embeddings_{args.num_ng}_{args.token_size}.pkl')
+
+    if do_precalc:
 
         tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+        bert_model = torch.hub.load('huggingface/pytorch-transformers', 'model', args.bert_path)
 
         # seed for Reproducibility
         seed_everything(args.seed)
 
         # load data
 
-        text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size)
-        default_tokenization = tokenize('Description: ', tokenizer, args.token_size)
+        text_df = create_text_df(tokenizer=tokenizer, max_length=args.token_size, train_bert=args.train_bert, model=bert_model, device=device)
+        default_row = tokenize('Description: ', tokenizer, args.token_size)
 
+        if not args.train_bert:
+            default_row = get_bert_embedding('Description: ', tokenizer, bert_model, args.token_size, device)
         train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
         train_rating_data = train_rating_data.merge(text_df, how='left', on='course_id')
-        train_rating_data['tokenization'] = train_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+        train_rating_data[text_column] = train_rating_data[text_column].apply(lambda x: default_row if type(x) == float else x)
         train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
         
 
 
         test_rating_data = pd.read_feather(TEST_DATA_PATH)
         test_rating_data = test_rating_data.merge(text_df, how='left', on='course_id')
-        test_rating_data['tokenization'] = test_rating_data['tokenization'].apply(lambda x: default_tokenization if type(x) == float else x)
+        test_rating_data[text_column] = test_rating_data[text_column].apply(lambda x: default_row if type(x) == float else x)
         test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
         
 
@@ -166,7 +192,7 @@ if __name__ == '__main__':
 
         
         tokenizations = None
-        tokenizations = ratings[['item_id', 'tokenization']].drop_duplicates(subset=['item_id'])
+        tokenizations = ratings[['item_id', text_column]].drop_duplicates(subset=['item_id'])
         tokenizations.set_index('item_id', inplace=True)
     else:
         train_rating_data = None

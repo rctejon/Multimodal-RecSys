@@ -14,13 +14,15 @@ class BertMF(nn.Module):
         self.layers = args.layers
         self.dropout = args.dropout
         self.token_size = args.token_size
+        self.train_bert = args.train_bert
 
         self.mlp = MultiLayerPerceptron(num_users, num_items, self.factor_num_mlp, self.layers)
         self.gmf = GeneralizedMatrixFactorization(num_users, num_items, self.factor_num_mf)
         self.bert = torch.hub.load('huggingface/pytorch-transformers', 'model', args.bert_path)
 
-        for param in self.bert.parameters():
-            param.requires_grad = False
+        if not self.train_bert:
+            for param in self.bert.parameters():
+                param.requires_grad = False
 
         self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + self.bert.config.hidden_size, out_features=1)
         self.logistic = nn.Sigmoid()
@@ -39,7 +41,10 @@ class BertMF(nn.Module):
     def forward(self, user_indices, item_indices, tokenizations):
         mlp_vector = self.mlp(user_indices, item_indices)
         mf_vector = self.gmf(user_indices, item_indices)
-        bert_vector = self.bert(**tokenizations).pooler_output
+        if self.train_bert:
+            bert_vector = self.bert(**tokenizations).pooler_output
+        else:
+            bert_vector = tokenizations
 
         vector = torch.cat([mlp_vector, mf_vector, bert_vector], dim=1)
 
