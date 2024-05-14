@@ -118,7 +118,7 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=100,
+        default=50,
         help="Number of negative samples for test set")
     parser.add_argument("--token_size",
         type=int,
