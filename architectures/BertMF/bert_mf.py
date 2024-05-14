@@ -41,9 +41,12 @@ class BertMF(nn.Module):
     def forward(self, user_indices, item_indices, tokenizations):
         mlp_vector = self.mlp(user_indices, item_indices)
         mf_vector = self.gmf(user_indices, item_indices)
-        if self.train_bert:
-            bert_vector = self.bert(**tokenizations).pooler_output
-        else:
+        try:
+            if self.train_bert:
+                bert_vector = self.bert(**tokenizations).pooler_output
+            else:
+                bert_vector = tokenizations
+        except:
             bert_vector = tokenizations
 
         vector = torch.cat([mlp_vector, mf_vector, bert_vector], dim=1)
