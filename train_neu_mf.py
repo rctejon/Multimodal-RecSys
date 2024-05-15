@@ -63,7 +63,7 @@ if __name__ == '__main__':
         help="dropout rate")
     parser.add_argument("--batch_size",
         type=int,
-        default=256,
+        default=512,
         help="batch size for training")
     parser.add_argument("--epochs",
         type=int,
