@@ -90,13 +90,13 @@ if __name__ == '__main__':
         type=int,
         default=100,
         help="Number of negative samples for test set")
-    parser.add_argument("--out",
-        default=True,
-        help="save model or not")
+    parser.add_argument("--train_bert",
+        default=False,
+        help="train bert")
     
     # set device and parameters
     args = parser.parse_args()
-    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.out)
+    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.train_bert)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
