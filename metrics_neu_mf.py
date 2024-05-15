@@ -88,6 +88,10 @@ if __name__ == '__main__':
         type=int,
         default=50,
         help="Number of negative samples for test set")
+    parser.add_argument("--train_bert",
+        type=bool,
+        default=False,
+        help="Train Bert")
     
     # set device and parameters
     args = parser.parse_args()

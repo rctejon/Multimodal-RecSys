@@ -55,7 +55,7 @@ class CreateDataloader(object):
 	
 	
 	def collate_fn(self, batch):
-		encoded_inputs = torch.cat([x[3] for x in batch]) if not self.train_bert else None
+		encoded_inputs = torch.cat([x[3] for x in batch]) if not self.train_bert and self.with_text else None
 		if self.with_text and self.train_bert:
 			input_ids = torch.cat(tuple(map(lambda x: x[3]['input_ids'], batch)), dim=0)
 			attention_mask = torch.cat(tuple(map(lambda x: x[3]['attention_mask'], batch)), dim=0)
