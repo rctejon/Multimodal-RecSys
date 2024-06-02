@@ -70,13 +70,22 @@ def metrics(model, test_loader, top_ks, device, ng_num):
 		PRECISION[top_k] = []
 
 	with torch.no_grad():
-		for user, item, label, tokenization in tqdm(test_loader, total=len(test_loader)):
+		for user, item, label, tokenization, graph_embeddings in tqdm(test_loader, total=len(test_loader)):
 			user = user.to(device)
 			item = item.to(device)
 			label = label.to(device)
 			if tokenization is not None:
 				tokenization = tokenization.to(device)
-			predictions = model(user, item, tokenization) if tokenization is not None else model(user, item)
+			if graph_embeddings is not None:
+				graph_embeddings = graph_embeddings.to(device)
+			if tokenization is not None and graph_embeddings is not None:
+				predictions = model(user, item, tokenization, graph_embeddings)
+			elif tokenization is not None:
+				predictions = model(user, item, tokenization)
+			elif graph_embeddings is not None:
+				predictions = model(user, item, graph_embeddings)
+			else:
+				predictions = model(user, item)
 			for top_k in top_ks:
 				ng_items, recommends, mrr_recommends = calculate_metrics_user(predictions, device, user, item, label, tokenization, top_k, ng_num)
 				HR[top_k].append(hit(ng_items, recommends))

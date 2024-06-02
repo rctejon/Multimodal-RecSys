@@ -10,10 +10,11 @@ import torch.optim as optim
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from metrics.metrics import metrics
-from architectures.NeuMF.neu_mf import NeuMF
+from architectures.GraphMF.graph_mf import GraphMF
 from loaders.create_dataloader import CreateDataloader
 from tqdm import tqdm
 import pickle
+os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def _reindex(ratings):
     """
@@ -30,7 +31,7 @@ def _reindex(ratings):
 
 if __name__ == '__main__':
     DATASET_NAME = 'MOOCCubeX'
-    MODEL_NAME = 'NeuMF'
+    MODEL_NAME = 'GraphMF'
     TRAIN_DATASET_FILE = 'train.feather'
     TEST_DATASET_FILE = 'test.feather'
     MAIN_PATH = f'./data/{DATASET_NAME}/'
@@ -79,7 +80,7 @@ if __name__ == '__main__':
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
-        default=[128,64,32,16,8],
+        default=[512,256,128,64,32,16,8],
         help="MLP layers. Note that the first layer is the concatenation of user \
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
@@ -88,8 +89,15 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=100,
+        default=50,
         help="Number of negative samples for test set")
+    parser.add_argument("--token_size",
+        type=int,
+        default=64,
+        help="size of the max token size")
+    parser.add_argument("--bert_path",
+        default='./transformers/BERT/model/',
+        help="path to the bert model")
     parser.add_argument("--train_bert",
         default=False,
         help="train bert")
@@ -101,38 +109,42 @@ if __name__ == '__main__':
     print(f"Using {device} device")
     writer = SummaryWriter()
 
+    text_column = 'embedding' if not args.train_bert else 'tokenization'
+
     # seed for Reproducibility
     seed_everything(args.seed)
+
+    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
+    bert_model = torch.hub.load('huggingface/pytorch-transformers', 'model', args.bert_path)
 
     # load data
     print(TRAIN_DATA_PATH)
     train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
     test_rating_data = pd.read_feather(TEST_DATA_PATH)
-    print(train_rating_data.head())
-
     train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
 
     ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
-
     # set the num_users, items
     num_users = ratings['user_id'].nunique()+1
     num_items = ratings['item_id'].nunique()+1
 
     print(num_users, num_items)
 
-    train_rating_data = _reindex(train_rating_data)
-    test_rating_data = _reindex(test_rating_data)
+    tokenizations = None
+
+    graph_embeddings = np.load(MAIN_PATH + 'glee_embeddings.npy')
+    print(graph_embeddings.shape)
 
 
     # construct the train and test datasets
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH)
+    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, tokenizations, graph_embeddings)
     print('Create Train Data Loader')
     train_loader = data.get_train_instance()
 
     # set model and loss, optimizer
-    model = NeuMF(args, num_users, num_items)
+    model = GraphMF(args, num_users, num_items)
     # model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
     model = model.to(device)
     print(model)
@@ -146,17 +158,18 @@ if __name__ == '__main__':
         model.train() # Enable dropout (if have).
         start_time = time.time()
 
-        for user, item, label, _, _ in tqdm(train_loader):
+        for user, item, label, _, graph_embeddings in tqdm(train_loader):
             # print(user.size(), item.size(), label.size())
             # print(user, item, label)
-            
             user = user.to(device)
             item = item.to(device)
             label = label.to(device)
+            graph_embeddings = graph_embeddings.to(device)
+
 
             optimizer.zero_grad()
             # print('Zero Grad')
-            prediction = model(user, item)
+            prediction = model(user, item, graph_embeddings)
             # print('Prediction')
             loss = loss_function(prediction, label)
             # print('Loss')
@@ -167,8 +180,8 @@ if __name__ == '__main__':
 
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time()-start_time))
-        if loss.item() < 0.001:
-            break
+        # if loss.item() < 0.001:
+        #     break
 
         model.eval()
 
