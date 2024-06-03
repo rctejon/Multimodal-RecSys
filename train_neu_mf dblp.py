@@ -29,10 +29,10 @@ def _reindex(ratings):
     return ratings
 
 if __name__ == '__main__':
-    DATASET_NAME = 'MOOCCubeX'
+    DATASET_NAME = 'DBLP_v12'
     MODEL_NAME = 'NeuMF'
-    TRAIN_DATASET_FILE = 'train.feather'
-    TEST_DATASET_FILE = 'test.feather'
+    TRAIN_DATASET_FILE = 'papers_train.feather'
+    TEST_DATASET_FILE = 'papers_test.feather'
     MAIN_PATH = f'./data/{DATASET_NAME}/'
     TRAIN_DATA_PATH = MAIN_PATH + TRAIN_DATASET_FILE
     TEST_DATA_PATH = MAIN_PATH + TEST_DATASET_FILE
@@ -88,7 +88,7 @@ if __name__ == '__main__':
         help="Number of negative samples for training set")
     parser.add_argument("--num_ng_test",
         type=int,
-        default=100,
+        default=50,
         help="Number of negative samples for test set")
     parser.add_argument("--train_bert",
         default=False,
@@ -110,8 +110,8 @@ if __name__ == '__main__':
     test_rating_data = pd.read_feather(TEST_DATA_PATH)
     print(train_rating_data.head())
 
-    train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
+    train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'references': 'item_id'})
+    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'references': 'item_id'})
 
     ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
 
