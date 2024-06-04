@@ -155,9 +155,13 @@ class CreateDataloader(object):
 			pickle.dump(items, open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'wb'))
 			pickle.dump(ratings, open(f'{self.dataset_path}/test_ratings_{self.num_ng_test}.pkl', 'wb'))
 		else:
-			users = pickle.load(open(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl', 'rb'))
-			items = pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb'))
-			ratings = pickle.load(open(f'{self.dataset_path}/test_ratings_{self.num_ng_test}.pkl', 'rb'))
+			print('loading test data')
+			users = np.array(pickle.load(open(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl', 'rb')))
+			print('done loading test users')
+			items = np.array(pickle.load(open(f'{self.dataset_path}/test_items_{self.num_ng_test}.pkl', 'rb')))
+			print('done loading test items')
+			ratings = np.array(pickle.load(open(f'{self.dataset_path}/test_ratings_{self.num_ng_test}.pkl', 'rb')))
+			print('done loading test ratings')
 
 		if self.with_text:
 			tokenization_list = self._get_test_tokenizations()
