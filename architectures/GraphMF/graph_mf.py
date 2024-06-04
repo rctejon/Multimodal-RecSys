@@ -6,7 +6,7 @@ from architectures.gat import GAT
 
 
 class GraphMF(nn.Module):
-    def __init__(self, args, num_users, num_items):
+    def __init__(self, args, num_users, num_items, use_item_embedding=True):
         super(GraphMF, self).__init__()
         self.num_users = num_users
         self.num_items = num_items
@@ -25,7 +25,10 @@ class GraphMF(nn.Module):
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-        self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + 258, out_features=1)
+        if use_item_embedding:
+            self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + 258, out_features=1)
+        else:
+            self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + 129, out_features=1)    
         self.logistic = nn.Sigmoid()
         self.init_weight()
 

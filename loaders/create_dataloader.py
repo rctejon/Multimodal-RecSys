@@ -13,13 +13,14 @@ class CreateDataloader(object):
 	"""
 	Construct Dataloaders
 	"""
-	def __init__(self, args, train_ratings, test_ratings, dataset_path, with_text=False, tokenizations=None, graph_embeddings=None):
+	def __init__(self, args, train_ratings, test_ratings, dataset_path, with_text=False, tokenizations=None, graph_embeddings=None, use_item_embedding=True):
 		self.num_ng = args.num_ng
 		self.num_ng_test = args.num_ng_test
 		self.batch_size = args.batch_size
 		self.dataset_path = dataset_path
 		self.with_text = with_text
 		self.train_bert = args.train_bert
+		self.use_item_embedding = use_item_embedding
 
 		self.NUM_USERS = 694529
 
@@ -68,11 +69,17 @@ class CreateDataloader(object):
 
 			encoded_inputs = BatchEncoding({'input_ids': input_ids, 'attention_mask': attention_mask, 'token_type_ids': token_type_ids})
 		if self.graph_embeddings is not None:
-			graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1] * 2))
+			if self.use_item_embedding:
+				graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1] * 2))
+			else:
+				graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1]))
 			for i, x in enumerate(batch):
 				user = x[0].item()
-				item = x[1].item() + self.NUM_USERS
-				graph_embeddings[i] = torch.tensor(np.concatenate([self.graph_embeddings[user], self.graph_embeddings[item]]))
+				if self.use_item_embedding:
+					item = x[1].item() + self.NUM_USERS
+					graph_embeddings[i] = torch.tensor(np.concatenate([self.graph_embeddings[user], self.graph_embeddings[item]]))
+				else:
+					graph_embeddings[i] = torch.tensor(self.graph_embeddings[user])
 
 		return (
 			torch.stack([x[0] for x in batch]),
