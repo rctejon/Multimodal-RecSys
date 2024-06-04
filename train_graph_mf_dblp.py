@@ -80,7 +80,7 @@ if __name__ == '__main__':
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
-        default=[128,64,32,16,8],
+        default=[64,32,16,8],
         help="MLP layers. Note that the first layer is the concatenation of user \
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
