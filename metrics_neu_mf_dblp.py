@@ -5,14 +5,11 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from metrics.metrics import metrics
 from architectures.NeuMF.neu_mf import NeuMF
 from loaders.create_dataloader import CreateDataloader
-from tqdm import tqdm
 import pickle
 
 def _reindex(ratings):
@@ -36,8 +33,9 @@ if __name__ == '__main__':
     MAIN_PATH = f'./data/{DATASET_NAME}/'
     TRAIN_DATA_PATH = MAIN_PATH + TRAIN_DATASET_FILE
     TEST_DATA_PATH = MAIN_PATH + TEST_DATASET_FILE
-    MODEL_PATH = f'./models/{DATASET_NAME}/'
     MODEL = f'{DATASET_NAME}-{MODEL_NAME}'
+    # MODEL = f'1_epoch'
+    MODEL_PATH = f'./models/{DATASET_NAME}/{MODEL}.pth'
 
     def seed_everything(seed):
         random.seed(seed)
@@ -63,7 +61,7 @@ if __name__ == '__main__':
         help="dropout rate")
     parser.add_argument("--batch_size",
         type=int,
-        default=512,
+        default=256,
         help="batch size for training")
     parser.add_argument("--epochs",
         type=int,
@@ -75,11 +73,11 @@ if __name__ == '__main__':
         help="compute metrics@top_k")
     parser.add_argument("--factor_num",
         type=int,
-        default=32,
+        default=64,
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
-        default=[64,32,16,8],
+        default=[128,64,32,16,8],
         help="MLP layers. Note that the first layer is the concatenation of user \
         and item embeddings. So layers[0]/2 is the embedding size.")
     parser.add_argument("--num_ng",
@@ -91,14 +89,14 @@ if __name__ == '__main__':
         default=50,
         help="Number of negative samples for test set")
     parser.add_argument("--train_bert",
+        type=bool,
         default=False,
-        help="train bert")
+        help="Train Bert")
     
     # set device and parameters
     args = parser.parse_args()
-    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.train_bert)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    # device = 'cpu'
+    device = torch.device("cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
 
@@ -106,79 +104,39 @@ if __name__ == '__main__':
     seed_everything(args.seed)
 
     # load data
-    # print(TRAIN_DATA_PATH)
+
     # train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
-    # test_rating_data = pd.read_feather(TEST_DATA_PATH)
-    # print(train_rating_data.head())
-
-    # train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'references': 'item_id'})
-    # test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'references': 'item_id'})
-
-    # ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
-
-    # # set the num_users, items
-    # num_users = ratings['user_id'].nunique()+1
-    # num_items = ratings['item_id'].nunique()+1
-
-    # print(num_users, num_items)
-
+    # train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     # train_rating_data = _reindex(train_rating_data)
+
+
+    # test_rating_data = pd.read_feather(TEST_DATA_PATH)
+    # test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
     # test_rating_data = _reindex(test_rating_data)
+
+    test_rating_data = None
 
 
     # construct the train and test datasets
 
-    train_rating_data = None
-    test_rating_data = None
+    data = CreateDataloader(args, test_rating_data, test_rating_data, MAIN_PATH)
+    print('Create Test Data Loader')
+    test_loader = data.get_test_instance()
 
-    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH)
-    print('Create Train Data Loader')
-    train_loader = data.get_train_instance()
+    start_time = time.time()
 
     # set model and loss, optimizer
-    model = NeuMF(args, 2794155, 2942027)
-    # model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
+    model = torch.load(MODEL_PATH)
     model = model.to(device)
-    print(model)
-    loss_function = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    top_ks = [1, 3, 5, 10]
 
-    # train, evaluation
-    best_hr = 0
-    for epoch in range(1, args.epochs+1):
-        model.train() # Enable dropout (if have).
-        start_time = time.time()
+    print('Calculate Metrics')
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, top_ks, device, args.num_ng_test)
 
-        for user, item, label, _, _ in tqdm(train_loader):
-            # print(user.size(), item.size(), label.size())
-            # print(user, item, label)
-            
-            user = user.to(device)
-            item = item.to(device)
-            label = label.to(device)
+    print(f"MRR: {MRR}")
 
-            optimizer.zero_grad()
-            # print('Zero Grad')
-            prediction = model(user, item)
-            # print('Prediction')
-            loss = loss_function(prediction, label)
-            # print('Loss')
-            loss.backward()
-            # print('Backward')
-            optimizer.step()
-            # print('Step')
+    for top_k in top_ks:
+        print(f"HR@{top_k}: {HR[top_k]}\tNDGC@{top_k}: {NDCG[top_k]}\tRECALL@{top_k}: {RECALL[top_k]}\tPRECISION@{top_k}: {PRECISION[top_k]}")
 
-        print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
-        print('epoch time: {:.4f}s'.format(time.time()-start_time))
-        if loss.item() < 0.001:
-            break
-
-        model.eval()
-
-    if not os.path.exists(MODEL_PATH):
-        os.mkdir(MODEL_PATH)
-    torch.save(model,
-        '{}{}.pth'.format(MODEL_PATH, MODEL))
-
-    print('Train done')
+    writer.close()
