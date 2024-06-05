@@ -182,8 +182,8 @@ if __name__ == '__main__':
 
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time()-start_time))
-        # if loss.item() < 0.001:
-        #     break
+        if loss.item() < 0.001:
+            break
 
         model.eval()
 
