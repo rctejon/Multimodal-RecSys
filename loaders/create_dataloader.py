@@ -109,7 +109,7 @@ class CreateDataloader(object):
 		)
 
 	def get_train_instance(self):
-		if not os.path.exists (f'{self.dataset_path}/train_users_{self.num_ng}.pkl'):
+		if not os.path.exists (f'{self.dataset_path}/train_users_{self.num_ng}.npy'):
 			users, items, ratings = [], [], []
 			train_ratings = pd.merge(self.train_ratings, self.negatives[['user_id', 'train_negative_samples']], on='user_id')
 			for row in tqdm(train_ratings.itertuples(), total=train_ratings.shape[0]):
@@ -124,9 +124,9 @@ class CreateDataloader(object):
 			pickle.dump(items, open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'wb'))
 			pickle.dump(ratings, open(f'{self.dataset_path}/train_ratings_{self.num_ng}.pkl', 'wb'))
 		else:
-			users = pickle.load(open(f'{self.dataset_path}/train_users_{self.num_ng}.pkl', 'rb'))
-			items = pickle.load(open(f'{self.dataset_path}/train_items_{self.num_ng}.pkl', 'rb'))
-			ratings = pickle.load(open(f'{self.dataset_path}/train_ratings_{self.num_ng}.pkl', 'rb'))
+			users = np.load(f'{self.dataset_path}/train_users_{self.num_ng}.npy')
+			items = np.load(f'{self.dataset_path}/train_items_{self.num_ng}.npy')
+			ratings = np.load(f'{self.dataset_path}/train_ratings_{self.num_ng}.npy')
 
 		if self.with_text:
 			# tokenization_list = self._get_train_tokenizations()
