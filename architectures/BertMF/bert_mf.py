@@ -48,6 +48,8 @@ class BertMF(nn.Module):
                 bert_vector = tokenizations
         except:
             bert_vector = tokenizations
+        
+        # print(mlp_vector.shape, mf_vector.shape, bert_vector.shape)
 
         vector = torch.cat([mlp_vector, mf_vector, bert_vector], dim=1)
 

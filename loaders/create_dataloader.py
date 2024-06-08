@@ -22,18 +22,21 @@ class CreateDataloader(object):
 		self.train_bert = args.train_bert
 		self.use_item_embedding = use_item_embedding
 
-		self.NUM_USERS = 694529
+		# self.NUM_USERS = 694529
+		self.NUM_USERS = 2942027
 
 		self.graph_embeddings = graph_embeddings
 
 		if self.with_text:
 			self.token_size = args.token_size
+			if os.path.exists(f'{self.dataset_path}/paper_embeddings.npy'):
+				self.embeddings = np.load(f'{self.dataset_path}/paper_embeddings.npy')
 
 		if not os.path.exists(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl'):
 			self.train_ratings = train_ratings
 			self.test_ratings = test_ratings
 			self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
-			print(train_ratings.shape, test_ratings.shape, self.ratings.shape)
+			# print(train_ratings.shape, test_ratings.shape, self.ratings.shape)
 			self.user_pool = set(self.ratings['user_id'].unique())
 			self.item_pool = set(self.ratings['item_id'].unique())
 			print('negative sampling')
@@ -61,7 +64,10 @@ class CreateDataloader(object):
 	
 	
 	def collate_fn(self, batch):
-		encoded_inputs = torch.cat([x[3] for x in batch]) if not self.train_bert and self.with_text else None
+		
+		# MOOCCubeX
+		# encoded_inputs = torch.cat([x[3] for x in batch]) if not self.train_bert and self.with_text else None			
+			
 		if self.with_text and self.train_bert:
 			input_ids = torch.cat(tuple(map(lambda x: x[3]['input_ids'], batch)), dim=0)
 			attention_mask = torch.cat(tuple(map(lambda x: x[3]['attention_mask'], batch)), dim=0)
@@ -73,13 +79,26 @@ class CreateDataloader(object):
 				graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1] * 2))
 			else:
 				graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1]))
+			if self.with_text and not self.train_bert:
+				encoded_inputs = torch.zeros((len(batch), self.token_size, 768))
 			for i, x in enumerate(batch):
 				user = x[0].item()
+				if not self.train_bert and self.with_text:
+					if user < self.NUM_USERS:
+						encoded_inputs[i] = torch.tensor(self.embeddings[user])
 				if self.use_item_embedding:
 					item = x[1].item() + self.NUM_USERS
 					graph_embeddings[i] = torch.tensor(np.concatenate([self.graph_embeddings[user], self.graph_embeddings[item]]))
 				else:
 					graph_embeddings[i] = torch.tensor(self.graph_embeddings[user])
+		elif self.with_text and not self.train_bert:
+			encoded_inputs = torch.zeros((len(batch), 768))
+			for i, x in enumerate(batch):
+				user = x[0].item()
+				if user < self.NUM_USERS:
+					# print(user, self.embeddprings[user].shape)
+					encoded_inputs[i] = torch.tensor(self.embeddings[user])
+
 
 		return (
 			torch.stack([x[0] for x in batch]),
@@ -110,7 +129,8 @@ class CreateDataloader(object):
 			ratings = pickle.load(open(f'{self.dataset_path}/train_ratings_{self.num_ng}.pkl', 'rb'))
 
 		if self.with_text:
-			tokenization_list = self._get_train_tokenizations()
+			# tokenization_list = self._get_train_tokenizations()
+			tokenization_list = None
 			dataset = RatingDataset(
 				user_list=users,
 				item_list=items,
@@ -171,7 +191,8 @@ class CreateDataloader(object):
 			print('done loading test ratings')
 
 		if self.with_text:
-			tokenization_list = self._get_test_tokenizations()
+			# tokenization_list = self._get_test_tokenizations()
+			tokenization_list = None
 			dataset = RatingDataset(
 				user_list=users,
 				item_list=items,
