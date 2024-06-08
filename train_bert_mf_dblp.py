@@ -110,7 +110,7 @@ if __name__ == '__main__':
         help="batch size for training")
     parser.add_argument("--epochs",
         type=int,
-        default=10,
+        default=3,
         help="training epoches")
     parser.add_argument("--top_k",
         type=int,
@@ -205,8 +205,8 @@ if __name__ == '__main__':
 
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time()-start_time))
-        # if loss.item() < 0.001:
-        #     break
+        if loss.item() < 0.001:
+            break
 
         model.eval()
 
