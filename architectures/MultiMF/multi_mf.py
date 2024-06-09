@@ -5,7 +5,7 @@ from architectures.generalized_matrix_factorization import GeneralizedMatrixFact
 
 
 class MultiMF(nn.Module):
-    def __init__(self, args, num_users, num_items):
+    def __init__(self, args, num_users, num_items, use_item_embedding=True):
         super(MultiMF, self).__init__()
         self.num_users = num_users
         self.num_items = num_items
@@ -24,7 +24,10 @@ class MultiMF(nn.Module):
             for param in self.bert.parameters():
                 param.requires_grad = False
 
-        self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + self.bert.config.hidden_size + 258, out_features=1)
+        if use_item_embedding:
+            self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + self.bert.config.hidden_size + 258, out_features=1)
+        else:
+            self.affine_output = nn.Linear(in_features=args.layers[-1] + self.factor_num_mf + self.bert.config.hidden_size + 129, out_features=1)
         self.logistic = nn.Sigmoid()
         self.init_weight()
 

@@ -80,7 +80,7 @@ class CreateDataloader(object):
 			else:
 				graph_embeddings = torch.zeros((len(batch), self.graph_embeddings.shape[1]))
 			if self.with_text and not self.train_bert:
-				encoded_inputs = torch.zeros((len(batch), self.token_size, 768))
+				encoded_inputs = torch.zeros((len(batch), 768))
 			for i, x in enumerate(batch):
 				user = x[0].item()
 				if not self.train_bert and self.with_text:
