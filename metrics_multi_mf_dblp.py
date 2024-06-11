@@ -5,15 +5,13 @@ import argparse
 import numpy as np
 import pandas as pd
 import torch
-import torch.nn as nn
-import torch.optim as optim
 import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from metrics.metrics import metrics
-from architectures.MultiMF.multi_mf import MultiMF
+from architectures.NeuMF.neu_mf import NeuMF
 from loaders.create_dataloader import CreateDataloader
-from tqdm import tqdm
 import pickle
+
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
 def _reindex(ratings):
@@ -37,8 +35,9 @@ if __name__ == '__main__':
     MAIN_PATH = f'./data/{DATASET_NAME}/'
     TRAIN_DATA_PATH = MAIN_PATH + TRAIN_DATASET_FILE
     TEST_DATA_PATH = MAIN_PATH + TEST_DATASET_FILE
-    MODEL_PATH = f'./models/{DATASET_NAME}/'
     MODEL = f'{DATASET_NAME}-{MODEL_NAME}'
+    # MODEL = f'1_epoch'
+    MODEL_PATH = f'./models/{DATASET_NAME}/{MODEL}.pth'
 
     def seed_everything(seed):
         random.seed(seed)
@@ -68,7 +67,7 @@ if __name__ == '__main__':
         help="batch size for training")
     parser.add_argument("--epochs",
         type=int,
-        default=3,
+        default=10,
         help="training epoches")
     parser.add_argument("--top_k",
         type=int,
@@ -76,7 +75,7 @@ if __name__ == '__main__':
         help="compute metrics@top_k")
     parser.add_argument("--factor_num",
         type=int,
-        default=48,
+        default=32,
         help="predictive factors numbers in the model")
     parser.add_argument("--layers",
         nargs='+',
@@ -104,72 +103,36 @@ if __name__ == '__main__':
     
     # set device and parameters
     args = parser.parse_args()
-    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng, args.num_ng_test, args.top_k, args.train_bert)
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
-
+    
     train_rating_data = None
     test_rating_data = None
-
     tokenizations = None
 
     graph_embeddings = np.load(MAIN_PATH + 'glee_embeddings.npy')
     print(graph_embeddings.shape)
 
-
     # construct the train and test datasets
 
     data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, tokenizations, graph_embeddings, False)
-    print('Create Train Data Loader')
-    train_loader = data.get_train_instance()
+    print('Create Test Data Loader')
+    test_loader = data.get_test_instance()
+
+    start_time = time.time()
 
     # set model and loss, optimizer
-    model = MultiMF(args, 2794155, 2942027, False)
-    # model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
+    model = torch.load(MODEL_PATH)
     model = model.to(device)
-    print(model)
-    loss_function = nn.BCELoss()
-    optimizer = optim.Adam(model.parameters(), lr=args.lr)
 
+    top_ks = [1, 3, 5, 10]
 
-    # train, evaluation
-    best_hr = 0
-    for epoch in range(1, args.epochs+1):
-        model.train() # Enable dropout (if have).
-        start_time = time.time()
+    print('Calculate Metrics')
+    HR, NDCG, MRR, RECALL, PRECISION = metrics(model, test_loader, top_ks, device, args.num_ng_test)
 
-        for user, item, label, tokenization, graph_embeddings in tqdm(train_loader):
-            # print(user.size(), item.size(), label.size())
-            # print(user, item, label)
-            user = user.to(device)
-            item = item.to(device)
-            label = label.to(device)
-            tokenization = tokenization.to(device)
-            graph_embeddings = graph_embeddings.to(device)
+    print(f"MRR: {MRR}")
 
-
-            optimizer.zero_grad()
-            # print('Zero Grad')
-            prediction = model(user, item, tokenization, graph_embeddings)
-            # print('Prediction')
-            loss = loss_function(prediction, label)
-            # print('Loss')
-            loss.backward()
-            # print('Backward')
-            optimizer.step()
-            # print('Step')
-
-        print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
-        print('epoch time: {:.4f}s'.format(time.time()-start_time))
-        # if loss.item() < 0.001:
-        #     break
-
-        model.eval()
-
-    if not os.path.exists(MODEL_PATH):
-        os.mkdir(MODEL_PATH)
-    torch.save(model,
-        '{}{}.pth'.format(MODEL_PATH, MODEL))
-
-    print('Train done')
+    for top_k in top_ks:
+        print(f"HR@{top_k}: {HR[top_k]}\tNDGC@{top_k}: {NDCG[top_k]}\tRECALL@{top_k}: {RECALL[top_k]}\tPRECISION@{top_k}: {PRECISION[top_k]}")
+    writer.close()
