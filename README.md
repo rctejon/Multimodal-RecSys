@@ -72,9 +72,12 @@ DBLPv12 includes:
 
 ## Running the Models
 
-To run the models, follow these steps:
+To run all the models first you need to run the pre-processing script to download the data
+and process it. This could take couple hourse given that the translation of the documents, 
+the graph contruction and embedding calculations are computatinally costly.
 
-1. **Clone the repository**:
-   ```sh
-   git clone https://github.com/your-repo/multimodal-recommender-system.git
-   cd multimodal-recommender-system
+After that you can train the models using the train_{model}.py for MOOCCubeX 
+and train_{model}_dblp.py for the citation network.
+
+For the metrics using the metrics_{model}.py for MOOCCubeX 
+and metrics_{model}_dblp.py for the citation network.
