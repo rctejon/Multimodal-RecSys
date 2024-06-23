@@ -22,21 +22,22 @@ class CreateDataloader(object):
 		self.train_bert = args.train_bert
 		self.use_item_embedding = use_item_embedding
 
-		# self.NUM_USERS = 694529
-		self.NUM_USERS = 2942027
+		self.NUM_USERS = 694529
+		# self.NUM_USERS = 2942027
 
 		self.graph_embeddings = graph_embeddings
 
+		# Load the embeddings if the model requires it
 		if self.with_text:
 			self.token_size = args.token_size
 			if os.path.exists(f'{self.dataset_path}/paper_embeddings.npy'):
 				self.embeddings = np.load(f'{self.dataset_path}/paper_embeddings.npy')
 
+		# We need to do the negative sampling just once, then is store in a pickle file
 		if not os.path.exists(f'{self.dataset_path}/test_users_{self.num_ng_test}.pkl'):
 			self.train_ratings = train_ratings
 			self.test_ratings = test_ratings
 			self.ratings = pd.concat([train_ratings, test_ratings], ignore_index=True)
-			# print(train_ratings.shape, test_ratings.shape, self.ratings.shape)
 			self.user_pool = set(self.ratings['user_id'].unique())
 			self.item_pool = set(self.ratings['item_id'].unique())
 			print('negative sampling')
@@ -45,6 +46,7 @@ class CreateDataloader(object):
 			
 		random.seed(args.seed)
 
+		# Load the tokenizations if the model trains the BERT model
 		if not self.train_bert:
 			if self.with_text and not os.path.exists(f'{self.dataset_path}/test_embeddings_{self.num_ng}_{self.token_size}.pkl'):
 				self.tokenizations = tokenizations

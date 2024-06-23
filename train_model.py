@@ -11,38 +11,68 @@ import torch.utils.data as data
 from tensorboardX import SummaryWriter
 from metrics.metrics import metrics
 from architectures.MultiMF.multi_mf import MultiMF
+from architectures.BertMF.bert_mf import BertMF
+from architectures.GraphMF.graph_mf import GraphMF
+from architectures.NeuMF.neu_mf import NeuMF
 from loaders.create_dataloader import CreateDataloader
 from tqdm import tqdm
 import pickle
 
 os.environ["TOKENIZERS_PARALLELISM"] = "true"
 
+def create_dataloader(model, main_path):
+    if model == 'MultiMF':
+        graph_embeddings = np.load(main_path + '/glee_embeddings.npy')
+        data = CreateDataloader(args, None, None, MAIN_PATH, True, None, graph_embeddings)
+    elif model == 'BertMF':
+        data = CreateDataloader(args, None, None, MAIN_PATH, True, None, None)
+    elif model == 'GraphMF':
+        graph_embeddings = np.load(main_path + '/glee_embeddings.npy')
+        data = CreateDataloader(args, None, None, MAIN_PATH, False, None, graph_embeddings)
+    elif model == 'NeuMF':
+        data = CreateDataloader(args, None, None, MAIN_PATH, False, None, None)
+    return data
 
-def _reindex(ratings):
-    """
-    Process dataset to reindex userID and itemID, also set rating as binary feedback
-    """
-    user2id = pickle.load(open(MAIN_PATH + 'user2id.pkl', 'rb'))
+def predict(model, user, item, tokenization, graph_embeddings):
+    if tokenization is not None and graph_embeddings is not None:
+        prediction = model(user, item, tokenization, graph_embeddings)
+    elif tokenization is not None:
+        prediction = model(user, item, tokenization)
+    elif graph_embeddings is not None:
+        prediction = model(user, item, graph_embeddings)
+    else:
+        prediction = model(user, item)
+    return prediction
 
-    item2id = pickle.load(open(MAIN_PATH + 'item2id.pkl', 'rb'))
 
-    ratings['user_id'] = ratings['user_id'].apply(lambda x: user2id[x])
-    ratings['item_id'] = ratings['item_id'].apply(lambda x: item2id[x])
-    ratings['rating'] = ratings['rating'].apply(lambda x: float(x > 0))
-    return ratings
+def getModel(model_name, args, num_users, num_items):
+    if model_name == 'MultiMF':
+        model = MultiMF(args, num_users, num_items, False)
+    elif model_name == 'BertMF':
+        model = BertMF(args, num_users, num_items)
+    elif model_name == 'GraphMF':
+        model = GraphMF(args, num_users, num_items)
+    elif model_name == 'NeuMF':
+        model = NeuMF(args, num_users, num_items)
+    return model
 
+DATASETS = {
+    'MOOCCubeX': {
+        'train_dataset_file': '/train.feather',
+        'test_dataset_file': '/test.feather'
+    }, 
+    'DBLP_v12': {
+        'train_dataset_file': '/papers_train.feather',
+        'test_dataset_file': '/papers_test.feather'
+    }
+}
+
+NUM_USER_AND_ITEMS = {
+    'MOOCCubeX': (694530, 4701),
+    'DBLP_v12': (2794155, 2942027)
+}
 
 if __name__ == '__main__':
-    DATASET_NAME = 'MOOCCubeX'
-    MODEL_NAME = 'MultiMF'
-    TRAIN_DATASET_FILE = 'train.feather'
-    TEST_DATASET_FILE = 'test.feather'
-    MAIN_PATH = f'./data/{DATASET_NAME}/'
-    TRAIN_DATA_PATH = MAIN_PATH + TRAIN_DATASET_FILE
-    TEST_DATA_PATH = MAIN_PATH + TEST_DATASET_FILE
-    MODEL_PATH = f'./models/{DATASET_NAME}/'
-    MODEL = f'{DATASET_NAME}-{MODEL_NAME}'
-
 
     def seed_everything(seed):
         random.seed(seed)
@@ -106,51 +136,42 @@ if __name__ == '__main__':
     parser.add_argument("--train_bert",
                         default=False,
                         help="train bert")
+    parser.add_argument("--dataset",
+                        default='DBLP_v12',
+                        help="Dataset")
+    parser.add_argument("--model",
+                        default='MultiMF',
+                        help="Model")
 
     # set device and parameters
     args = parser.parse_args()
-    print(args.epochs, args.lr, args.dropout, args.batch_size, args.factor_num, args.layers, args.num_ng,
-          args.num_ng_test, args.top_k, args.train_bert)
+    print(args.dataset, args.model)
+    
+    DATASET_NAME = args.dataset
+    MODEL_NAME = args.model
+    TRAIN_DATASET_FILE = DATASETS[DATASET_NAME]['train_dataset_file']
+    TEST_DATASET_FILE = DATASETS[DATASET_NAME]['test_dataset_file']
+    MAIN_PATH = f'./data/{DATASET_NAME}'
+    TRAIN_DATA_PATH = MAIN_PATH + TRAIN_DATASET_FILE
+    TEST_DATA_PATH = MAIN_PATH + TEST_DATASET_FILE
+    MODEL_PATH = f'./models/{DATASET_NAME}/'
+    MODEL = f'{DATASET_NAME}-{MODEL_NAME}'
+
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using {device} device")
     writer = SummaryWriter()
 
-    text_column = 'embedding' if not args.train_bert else 'tokenization'
-
     # seed for Reproducibility
     seed_everything(args.seed)
 
-    tokenizer = torch.hub.load('huggingface/pytorch-transformers', 'tokenizer', './transformers/BERT/tokenizer/')
-    bert_model = torch.hub.load('huggingface/pytorch-transformers', 'model', args.bert_path)
-
-    # load data
-    print(TRAIN_DATA_PATH)
-    train_rating_data = pd.read_feather(TRAIN_DATA_PATH)
-    test_rating_data = pd.read_feather(TEST_DATA_PATH)
-    train_rating_data = train_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-    test_rating_data = test_rating_data.rename(columns={'id': 'user_id', 'course_id': 'item_id'})
-
-    ratings = pd.concat([train_rating_data, test_rating_data], ignore_index=True)
-    # set the num_users, items
-    num_users = ratings['user_id'].nunique() + 1
-    num_items = ratings['item_id'].nunique() + 1
-
-    print(num_users, num_items)
-
-    tokenizations = None
-
-    graph_embeddings = np.load(MAIN_PATH + 'glee_embeddings.npy')
-    print(graph_embeddings.shape)
-
-    # construct the train and test datasets
-
-    data = CreateDataloader(args, train_rating_data, test_rating_data, MAIN_PATH, True, tokenizations, graph_embeddings)
+    # load data and construct the train and test datasets
+    data = create_dataloader(MODEL_NAME, MAIN_PATH)
     print('Create Train Data Loader')
     train_loader = data.get_train_instance()
 
     # set model and loss, optimizer
-    model = MultiMF(args, num_users, num_items)
-    # model = torch.load('{}{}.pth'.format(MODEL_PATH, MODEL))
+    num_users, num_items = NUM_USER_AND_ITEMS[DATASET_NAME]
+    model = getModel(MODEL_NAME, args, num_users, num_items)
     model = model.to(device)
     print(model)
     loss_function = nn.BCELoss()
@@ -163,29 +184,22 @@ if __name__ == '__main__':
         start_time = time.time()
 
         for user, item, label, tokenization, graph_embeddings in tqdm(train_loader):
-            # print(user.size(), item.size(), label.size())
-            # print(user, item, label)
             user = user.to(device)
             item = item.to(device)
             label = label.to(device)
-            tokenization = tokenization.to(device)
-            graph_embeddings = graph_embeddings.to(device)
+            if tokenization is not None:
+                tokenization = tokenization.to(device)
+            if graph_embeddings is not None:
+                graph_embeddings = graph_embeddings.to(device)
 
             optimizer.zero_grad()
-            # print('Zero Grad')
-            prediction = model(user, item, tokenization, graph_embeddings)
-            # print('Prediction')
+            prediction = predict(model, user, item, tokenization, graph_embeddings)
             loss = loss_function(prediction, label)
-            # print('Loss')
             loss.backward()
-            # print('Backward')
             optimizer.step()
-            # print('Step')
 
         print('Epoch: {}, Loss: {:.4f}'.format(epoch, loss.item()))
         print('epoch time: {:.4f}s'.format(time.time() - start_time))
-        # if loss.item() < 0.001:
-        #     break
 
         model.eval()
 
